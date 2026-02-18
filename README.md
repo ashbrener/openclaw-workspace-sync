@@ -6,17 +6,55 @@ Supports **Dropbox, Google Drive, OneDrive, S3/R2/Minio**, and [70+ cloud provid
 
 ## How it works
 
-```
-Local Machine              Cloud Provider              Remote Gateway
-~/Dropbox/openclaw/    <->    Dropbox/GDrive/etc    <->    <workspace>/shared/
-   (native app)               (any provider)              (rclone bisync)
+```mermaid
+flowchart TB
+    subgraph local["Local Machine"]
+        direction LR
+        localFolder["~/Dropbox/openclaw/"]
+        localApp["Native cloud app\n(Dropbox/GDrive/OneDrive)"]
+        localFolder <--> localApp
+    end
+
+    subgraph cloud["Cloud Provider"]
+        cloudStorage["Dropbox / Google Drive / OneDrive / S3 / R2 + 70 more"]
+    end
+
+    subgraph remote["Remote Gateway (Fly/VPS)"]
+        direction LR
+        rclone["rclone bisync\n(background sync)"]
+        remoteFolder["workspace/shared/"]
+        rclone <--> remoteFolder
+    end
+
+    localApp <--> cloudStorage
+    cloudStorage <--> rclone
+
+    style local fill:#e8f5e9,stroke:#4caf50
+    style cloud fill:#e3f2fd,stroke:#2196f3
+    style remote fill:#fff3e0,stroke:#ff9800
 ```
 
-- **Local**: Native cloud app syncs `~/Dropbox/openclaw/` (or equivalent)
-- **Remote**: rclone bisync keeps `<workspace>/shared/` in sync with the cloud
-- **Result**: Drop a file locally, it appears on the remote Gateway (and vice versa)
+Drop a file locally — it appears on the remote Gateway (and vice versa).
 
 **Zero LLM cost.** All sync operations are pure rclone file operations — they never wake the bot or trigger LLM calls.
+
+## Architecture
+
+```mermaid
+flowchart TD
+    subgraph Plugin["workspace-sync plugin"]
+        cli["CLI Commands\nsetup / sync / status / authorize / list"]
+        hooks["Session Hooks\nauto-sync on start/end"]
+        manager["Background Sync Manager\ninterval-based bisync"]
+        rclone["rclone wrapper\nbinary detection, config gen, OAuth"]
+    end
+
+    cli --> rclone
+    hooks --> rclone
+    manager --> rclone
+
+    style Plugin fill:#f3e5f5,stroke:#9c27b0
+```
 
 ## Install
 
@@ -57,7 +95,7 @@ Add to your `openclaw.json`:
 {
   "plugins": {
     "entries": {
-      "openclaw-workspace-sync": {
+      "workspace-sync": {
         "enabled": true,
         "config": {
           "provider": "dropbox",
