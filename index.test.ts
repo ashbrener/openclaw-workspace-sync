@@ -18,7 +18,7 @@ describe("workspace-sync plugin", () => {
     const on = vi.fn();
 
     const api = {
-      id: "workspace-sync",
+      id: "openclaw-workspace-sync",
       name: "Workspace Cloud Sync",
       source: "test",
       config: {},
@@ -68,7 +68,7 @@ describe("workspace-sync plugin", () => {
     const on = vi.fn();
 
     const api = {
-      id: "workspace-sync",
+      id: "openclaw-workspace-sync",
       name: "Workspace Cloud Sync",
       source: "test",
       config: {},
@@ -104,7 +104,7 @@ describe("workspace-sync plugin", () => {
     const on = vi.fn();
 
     const api = {
-      id: "workspace-sync",
+      id: "openclaw-workspace-sync",
       name: "Workspace Cloud Sync",
       source: "test",
       config: {},

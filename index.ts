@@ -400,7 +400,7 @@ const workspaceSyncPlugin = {
               `Add to your openclaw.json:\n\n` +
                 `"plugins": {\n` +
                 `  "entries": {\n` +
-                `    "workspace-sync": {\n` +
+                `    "openclaw-workspace-sync": {\n` +
                 `      "enabled": true,\n` +
                 `      "config": {\n` +
                 `        "provider": "${provider}",\n` +

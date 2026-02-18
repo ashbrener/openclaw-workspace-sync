@@ -39,7 +39,7 @@ function createMockApi(pluginConfig: Record<string, unknown> = {}) {
   const hooks: Record<string, HookHandler> = {};
 
   const api = {
-    id: "workspace-sync",
+    id: "openclaw-workspace-sync",
     name: "Workspace Cloud Sync",
     source: "test",
     config: {},
