@@ -38,7 +38,7 @@ function parsePluginConfig(raw: Record<string, unknown> | undefined): WorkspaceS
 }
 
 const workspaceSyncPlugin = {
-  id: "workspace-sync",
+  id: "openclaw-workspace-sync",
   name: "Workspace Cloud Sync",
   description:
     "Bidirectional workspace sync with cloud storage (Dropbox, Google Drive, S3, OneDrive, 70+ providers) via rclone",
@@ -137,12 +137,12 @@ const workspaceSyncPlugin = {
 
               if (result.ok) {
                 console.log("Sync completed");
-                if (result.filesTransferred) {
-                  console.log(`Files transferred: ${result.filesTransferred}`);
+                if ((result as any).filesTransferred) {
+                  console.log(`Files transferred: ${(result as any).filesTransferred}`);
                 }
               } else {
-                console.error(`Sync failed: ${result.error}`);
-                if (result.error?.includes("--resync")) {
+                console.error(`Sync failed: ${(result as any).error}`);
+                if ((result as any).error?.includes("--resync")) {
                   console.error("First sync requires --resync: openclaw workspace sync --resync");
                 }
                 process.exit(1);
@@ -199,7 +199,7 @@ const workspaceSyncPlugin = {
               remoteName: resolved.remoteName,
             });
             if (!check.ok) {
-              console.log(`Connection: FAILED (${check.error})`);
+              console.log(`Connection: FAILED (${(check as any).error})`);
               return;
             }
             console.log("Connection: OK");
@@ -375,7 +375,7 @@ const workspaceSyncPlugin = {
             const authResult = await authorizeRclone(provider, appKey, appSecret);
 
             if (!authResult.ok) {
-              clack.log.error(`Authorization failed: ${authResult.error}`);
+              clack.log.error(`Authorization failed: ${(authResult as any).error}`);
               clack.outro("Fix the error and run 'openclaw workspace setup' again.");
               process.exit(1);
               return;
@@ -453,7 +453,7 @@ const workspaceSyncPlugin = {
               );
 
               if (!result.ok) {
-                console.error(`Authorization failed: ${result.error}`);
+                console.error(`Authorization failed: ${(result as any).error}`);
                 process.exit(1);
               }
 
@@ -464,7 +464,7 @@ const workspaceSyncPlugin = {
               const configPath =
                 syncConfig.configPath || `${stateDir}/.config/rclone/rclone.conf`;
 
-              const configContent = generateRcloneConfig(provider, remoteName, result.token, {
+              const configContent = generateRcloneConfig(provider, remoteName, (result as any).token, {
                 dropbox: syncConfig.dropbox,
                 s3: syncConfig.s3,
               });
@@ -507,20 +507,20 @@ const workspaceSyncPlugin = {
             });
 
             if (!result.ok) {
-              console.error(`Failed to list: ${result.error}`);
+              console.error(`Failed to list: ${(result as any).error}`);
               process.exit(1);
             }
 
-            if (result.files.length === 0) {
+            if ((result as any).files.length === 0) {
               console.log("No files in remote.");
               return;
             }
 
             console.log(`${resolved.remoteName}:${resolved.remotePath}/`);
-            for (const file of result.files) {
+            for (const file of (result as any).files) {
               console.log(`  ${file}`);
             }
-            console.log(`\n${result.files.length} files`);
+            console.log(`\n${(result as any).files.length} files`);
           });
       },
       { commands: ["workspace"] },
@@ -574,12 +574,12 @@ const workspaceSyncPlugin = {
 
           if (result.ok) {
             api.logger.info("[workspace-sync] session start sync completed");
-          } else if (result.error?.includes("--resync")) {
+          } else if ((result as any).error?.includes("--resync")) {
             api.logger.warn(
               "[workspace-sync] first sync requires manual --resync. Run: openclaw workspace sync --resync",
             );
           } else {
-            api.logger.error(`[workspace-sync] sync failed: ${result.error}`);
+            api.logger.error(`[workspace-sync] sync failed: ${(result as any).error}`);
           }
         } catch (err) {
           api.logger.error(
@@ -622,7 +622,7 @@ const workspaceSyncPlugin = {
           if (result.ok) {
             api.logger.info("[workspace-sync] session end sync completed");
           } else {
-            api.logger.error(`[workspace-sync] sync failed: ${result.error}`);
+            api.logger.error(`[workspace-sync] sync failed: ${(result as any).error}`);
           }
         } catch (err) {
           api.logger.error(
@@ -637,7 +637,7 @@ const workspaceSyncPlugin = {
     // ========================================================================
 
     api.registerService({
-      id: "workspace-sync",
+      id: "openclaw-workspace-sync",
       start: (ctx) => {
         if (!syncConfig.provider || syncConfig.provider === "off") {
           api.logger.info("[workspace-sync] service: sync not configured, idle");

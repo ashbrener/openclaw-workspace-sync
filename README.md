@@ -21,7 +21,7 @@ Local Machine              Cloud Provider              Remote Gateway
 ## Install
 
 ```bash
-openclaw plugins install @openclaw/workspace-sync
+openclaw plugins install openclaw-workspace-sync
 ```
 
 Or clone into your extensions directory:
@@ -57,7 +57,7 @@ Add to your `openclaw.json`:
 {
   "plugins": {
     "entries": {
-      "workspace-sync": {
+      "openclaw-workspace-sync": {
         "enabled": true,
         "config": {
           "provider": "dropbox",
@@ -292,13 +292,13 @@ chmod -R 755 <workspace>/shared
 
 ```bash
 # Install dependencies
-pnpm install
+npm install
 
 # Run tests
-pnpm test
+npm test
 
 # Type check
-pnpm tsgo --noEmit
+npx tsc --noEmit
 ```
 
 ## License

@@ -1,5 +1,5 @@
 {
-  "id": "workspace-sync",
+  "id": "openclaw-workspace-sync",
   "uiHints": {
     "provider": {
       "label": "Cloud Provider",
@@ -73,7 +73,14 @@
     "properties": {
       "provider": {
         "type": "string",
-        "enum": ["off", "dropbox", "gdrive", "onedrive", "s3", "custom"]
+        "enum": [
+          "off",
+          "dropbox",
+          "gdrive",
+          "onedrive",
+          "s3",
+          "custom"
+        ]
       },
       "remotePath": {
         "type": "string"
@@ -99,11 +106,17 @@
       },
       "conflictResolve": {
         "type": "string",
-        "enum": ["newer", "local", "remote"]
+        "enum": [
+          "newer",
+          "local",
+          "remote"
+        ]
       },
       "exclude": {
         "type": "array",
-        "items": { "type": "string" }
+        "items": {
+          "type": "string"
+        }
       },
       "copySymlinks": {
         "type": "boolean"
@@ -112,21 +125,39 @@
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "endpoint": { "type": "string" },
-          "bucket": { "type": "string" },
-          "region": { "type": "string" },
-          "accessKeyId": { "type": "string" },
-          "secretAccessKey": { "type": "string" }
+          "endpoint": {
+            "type": "string"
+          },
+          "bucket": {
+            "type": "string"
+          },
+          "region": {
+            "type": "string"
+          },
+          "accessKeyId": {
+            "type": "string"
+          },
+          "secretAccessKey": {
+            "type": "string"
+          }
         }
       },
       "dropbox": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "appFolder": { "type": "boolean" },
-          "appKey": { "type": "string" },
-          "appSecret": { "type": "string" },
-          "token": { "type": "string" }
+          "appFolder": {
+            "type": "boolean"
+          },
+          "appKey": {
+            "type": "string"
+          },
+          "appSecret": {
+            "type": "string"
+          },
+          "token": {
+            "type": "string"
+          }
         }
       }
     }

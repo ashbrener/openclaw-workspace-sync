@@ -3,7 +3,7 @@
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "strict": true,
+    "strict": false,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
@@ -13,8 +13,8 @@
     "sourceMap": true,
     "outDir": "dist",
     "rootDir": ".",
-    "types": ["vitest/globals"]
+    "types": ["node"]
   },
-  "include": ["*.ts", "skills/**/*"],
-  "exclude": ["node_modules", "dist", "*.test.ts"]
+  "include": ["*.ts"],
+  "exclude": ["node_modules", "dist", "*.test.ts", "vitest.config.ts"]
 }

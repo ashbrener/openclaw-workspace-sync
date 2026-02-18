@@ -54,7 +54,7 @@ Workspace sync is configured via the plugin entry in `openclaw.json`:
 {
   "plugins": {
     "entries": {
-      "workspace-sync": {
+      "openclaw-workspace-sync": {
         "enabled": true,
         "config": {
           "provider": "dropbox",
