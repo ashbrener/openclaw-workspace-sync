@@ -6,32 +6,29 @@ Supports **Dropbox, Google Drive, OneDrive, S3/R2/Minio**, and [70+ cloud provid
 
 ## How it works
 
-```mermaid
-flowchart TB
-    subgraph local["Local Machine"]
-        direction LR
-        localFolder["~/Dropbox/openclaw/"]
-        localApp["Native cloud app\n(Dropbox/GDrive/OneDrive)"]
-        localFolder <--> localApp
-    end
-
-    subgraph cloud["Cloud Provider"]
-        cloudStorage["Dropbox / Google Drive / OneDrive / S3 / R2 + 70 more"]
-    end
-
-    subgraph remote["Remote Gateway (Fly/VPS)"]
-        direction LR
-        rclone["rclone bisync\n(background sync)"]
-        remoteFolder["workspace/shared/"]
-        rclone <--> remoteFolder
-    end
-
-    localApp <--> cloudStorage
-    cloudStorage <--> rclone
-
-    style local fill:#e8f5e9,stroke:#4caf50
-    style cloud fill:#e3f2fd,stroke:#2196f3
-    style remote fill:#fff3e0,stroke:#ff9800
+```
+┌─────────────────────────────┐
+│       Local Machine         │
+│                             │
+│  ~/Dropbox/openclaw/  <-->  │
+│  Native cloud app           │
+│  (Dropbox/GDrive/OneDrive)  │
+└─────────────┬───────────────┘
+              │
+              ▼
+┌─────────────────────────────┐
+│       Cloud Provider        │
+│  Dropbox / Google Drive /   │
+│  OneDrive / S3 / R2 + 70+  │
+└─────────────┬───────────────┘
+              │
+              ▼
+┌─────────────────────────────┐
+│  Remote Gateway (Fly/VPS)   │
+│                             │
+│  rclone bisync  <-->        │
+│  workspace/shared/          │
+└─────────────────────────────┘
 ```
 
 Drop a file locally — it appears on the remote Gateway (and vice versa).
@@ -40,20 +37,28 @@ Drop a file locally — it appears on the remote Gateway (and vice versa).
 
 ## Architecture
 
-```mermaid
-flowchart TD
-    subgraph Plugin["workspace-sync plugin"]
-        cli["CLI Commands\nsetup / sync / status / authorize / list"]
-        hooks["Session Hooks\nauto-sync on start/end"]
-        manager["Background Sync Manager\ninterval-based bisync"]
-        rclone["rclone wrapper\nbinary detection, config gen, OAuth"]
-    end
-
-    cli --> rclone
-    hooks --> rclone
-    manager --> rclone
-
-    style Plugin fill:#f3e5f5,stroke:#9c27b0
+```
+┌─────────────────────────────────────────┐
+│         workspace-sync plugin           │
+│                                         │
+│  ┌─────────────┐  ┌──────────────────┐  │
+│  │ CLI Commands │  │  Session Hooks   │  │
+│  │ setup/sync/  │  │  auto-sync on    │  │
+│  │ status/auth  │  │  start/end       │  │
+│  └──────┬──────┘  └────────┬─────────┘  │
+│         │                  │            │
+│         │  ┌───────────────────────┐    │
+│         │  │ Background Sync Mgr  │    │
+│         │  │ interval-based bisync │    │
+│         │  └───────────┬──────────┘    │
+│         │              │               │
+│         ▼              ▼               │
+│  ┌─────────────────────────────────┐   │
+│  │       rclone wrapper            │   │
+│  │  binary detect, config gen,     │   │
+│  │  OAuth, bisync orchestration    │   │
+│  └─────────────────────────────────┘   │
+└─────────────────────────────────────────┘
 ```
 
 ## Install
