@@ -1,5 +1,5 @@
 {
-  "id": "openclaw-workspace-sync",
+  "id": "workspace-sync",
   "uiHints": {
     "provider": {
       "label": "Cloud Provider",
