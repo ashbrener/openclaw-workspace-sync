@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import workspaceSyncPlugin from "./index.js";
+import workspaceSyncPlugin from "../src/index.js";
 
 describe("workspace-sync plugin", () => {
   it("exports correct plugin metadata", () => {

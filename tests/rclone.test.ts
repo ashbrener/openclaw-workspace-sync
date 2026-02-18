@@ -8,7 +8,7 @@ import {
   generateRcloneConfig,
   isRcloneConfigured,
   ensureRcloneConfigFromConfig,
-} from "./rclone.js";
+} from "../src/rclone.js";
 
 describe("rclone helpers", () => {
   describe("resolveSyncConfig", () => {

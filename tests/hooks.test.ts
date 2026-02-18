@@ -8,7 +8,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock rclone before importing the plugin
-vi.mock("./rclone.js", () => ({
+vi.mock("../src/rclone.js", () => ({
   setLogger: vi.fn(),
   isRcloneInstalled: vi.fn(),
   isRcloneConfigured: vi.fn(),
@@ -24,14 +24,14 @@ vi.mock("./rclone.js", () => ({
   generateRcloneConfig: vi.fn(),
 }));
 
-vi.mock("./sync-manager.js", () => ({
+vi.mock("../src/sync-manager.js", () => ({
   startSyncManager: vi.fn(),
   stopSyncManager: vi.fn(),
   getSyncManagerStatus: vi.fn(() => ({ running: false })),
 }));
 
-import * as rclone from "./rclone.js";
-import workspaceSyncPlugin from "./index.js";
+import * as rclone from "../src/rclone.js";
+import workspaceSyncPlugin from "../src/index.js";
 
 type HookHandler = (event: Record<string, unknown>, ctx: Record<string, unknown>) => Promise<void>;
 

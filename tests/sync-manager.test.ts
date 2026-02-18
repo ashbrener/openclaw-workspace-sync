@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { startSyncManager, stopSyncManager, getSyncManagerStatus } from "./sync-manager.js";
+import { startSyncManager, stopSyncManager, getSyncManagerStatus } from "../src/sync-manager.js";
 
 const mockLogger = {
   debug: vi.fn(),

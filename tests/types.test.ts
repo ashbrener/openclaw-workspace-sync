@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { WorkspaceSyncConfig, WorkspaceSyncProvider } from "./types.js";
+import type { WorkspaceSyncConfig, WorkspaceSyncProvider } from "../src/types.js";
 
 describe("workspace-sync types", () => {
   it("WorkspaceSyncProvider accepts valid values", () => {
