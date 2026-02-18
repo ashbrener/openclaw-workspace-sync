@@ -6,30 +6,9 @@ Supports **Dropbox, Google Drive, OneDrive, S3/R2/Minio**, and [70+ cloud provid
 
 ## How it works
 
-```
-┌─────────────────────────────┐
-│       Local Machine         │
-│                             │
-│  ~/Dropbox/openclaw/  <-->  │
-│  Native cloud app           │
-│  (Dropbox/GDrive/OneDrive)  │
-└─────────────┬───────────────┘
-              │
-              ▼
-┌─────────────────────────────┐
-│       Cloud Provider        │
-│  Dropbox / Google Drive /   │
-│  OneDrive / S3 / R2 + 70+   │
-└─────────────┬───────────────┘
-              │
-              ▼
-┌─────────────────────────────┐
-│  Remote Gateway (Fly/VPS)   │
-│                             │
-│  rclone bisync  <-->        │
-│  workspace/shared/          │
-└─────────────────────────────┘
-```
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ashbrener/openclaw-workspace-sync/main/docs/how-it-works.png" alt="How it works — Local Machine syncs to Cloud Provider syncs to Remote Gateway" width="600" />
+</p>
 
 Drop a file locally — it appears on the remote Gateway (and vice versa).
 
@@ -37,29 +16,9 @@ Drop a file locally — it appears on the remote Gateway (and vice versa).
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────┐
-│         workspace-sync plugin           │
-│                                         │
-│  ┌─────────────┐  ┌──────────────────┐  │
-│  │ CLI Commands│  │  Session Hooks   │  │
-│  │ setup/sync/ │  │  auto-sync on    │  │
-│  │ status/auth │  │  start/end       │  │
-│  └──────┬──────┘  └────────┬─────────┘  │
-│         │                  │            │
-│         │  ┌───────────────────────┐    │
-│         │  │ Background Sync Mgr   │    │
-│         │  │ interval-based bisync │    │
-│         │  └───────────┬──────────-┘    │
-│         │              │                │
-│         ▼              ▼                │
-│  ┌─────────────────────────────────┐    │
-│  │       rclone wrapper            │    │
-│  │  binary detect, config gen,     │    │
-│  │  OAuth, bisync orchestration    │    │
-│  └─────────────────────────────────┘    │
-└─────────────────────────────────────────┘
-```
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ashbrener/openclaw-workspace-sync/main/docs/architecture.png" alt="Plugin architecture — CLI, Hooks, and Sync Manager feed into rclone wrapper" width="600" />
+</p>
 
 ## Install
 
