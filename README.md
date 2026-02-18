@@ -19,7 +19,7 @@ Supports **Dropbox, Google Drive, OneDrive, S3/R2/Minio**, and [70+ cloud provid
 ┌─────────────────────────────┐
 │       Cloud Provider        │
 │  Dropbox / Google Drive /   │
-│  OneDrive / S3 / R2 + 70+  │
+│  OneDrive / S3 / R2 + 70+   │
 └─────────────┬───────────────┘
               │
               ▼
@@ -50,14 +50,14 @@ Drop a file locally — it appears on the remote Gateway (and vice versa).
 │         │  ┌───────────────────────┐    │
 │         │  │ Background Sync Mgr   │    │
 │         │  │ interval-based bisync │    │
-│         │  └───────────┬──────────_┘    │
-│         │              │               │
-│         ▼              ▼               │
-│  ┌─────────────────────────────────┐   │
-│  │       rclone wrapper            │   │
-│  │  binary detect, config gen,     │   │
-│  │  OAuth, bisync orchestration    │   │
-│  └─────────────────────────────────┘   │
+│         │  └───────────┬──────────-┘    │
+│         │              │                │
+│         ▼              ▼                │
+│  ┌─────────────────────────────────┐    │
+│  │       rclone wrapper            │    │
+│  │  binary detect, config gen,     │    │
+│  │  OAuth, bisync orchestration    │    │
+│  └─────────────────────────────────┘    │
 └─────────────────────────────────────────┘
 ```
 
