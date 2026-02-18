@@ -240,39 +240,17 @@ For the full list of 70+ providers, see [rclone overview](https://rclone.org/ove
 
 ## Manual setup (without wizard)
 
-### 1. Install rclone
-
-- **macOS**: `brew install rclone`
-- **Linux**: `curl -s https://rclone.org/install.sh | sudo bash`
-- **Docker**: `RUN curl -s https://rclone.org/install.sh | bash`
-
-### 2. Authorize rclone (from your local machine)
-
-Run on a machine with a browser:
+If you prefer to skip the interactive wizard, configure the plugin in `openclaw.json` and use the CLI:
 
 ```bash
-rclone authorize "dropbox"   # or: gdrive, onedrive
-```
+# 1. Authorize with your cloud provider
+openclaw workspace authorize --provider dropbox
 
-Copy the JSON token it outputs.
-
-### 3. Configure on the Gateway
-
-```bash
-mkdir -p ~/.openclaw/.config/rclone
-
-cat > ~/.openclaw/.config/rclone/rclone.conf << 'EOF'
-[cloud]
-type = dropbox
-token = {"access_token":"YOUR_TOKEN_HERE","token_type":"bearer","expiry":"..."}
-EOF
-```
-
-### 4. First sync
-
-```bash
+# 2. Run the first sync (establishes baseline)
 openclaw workspace sync --resync
 ```
+
+The plugin handles rclone installation, config generation, and token storage automatically based on your `openclaw.json` settings.
 
 ## Dropbox app folder access (recommended)
 
