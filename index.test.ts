@@ -3,7 +3,7 @@ import workspaceSyncPlugin from "./index.js";
 
 describe("workspace-sync plugin", () => {
   it("exports correct plugin metadata", () => {
-    expect(workspaceSyncPlugin.id).toBe("workspace-sync");
+    expect(workspaceSyncPlugin.id).toBe("openclaw-workspace-sync");
     expect(workspaceSyncPlugin.name).toBe("Workspace Cloud Sync");
     expect(workspaceSyncPlugin.description).toContain("rclone");
   });
@@ -55,7 +55,7 @@ describe("workspace-sync plugin", () => {
 
     expect(registerService).toHaveBeenCalledTimes(1);
     expect(registerService).toHaveBeenCalledWith(
-      expect.objectContaining({ id: "workspace-sync" }),
+      expect.objectContaining({ id: "openclaw-workspace-sync" }),
     );
 
     // session_start + session_end hooks

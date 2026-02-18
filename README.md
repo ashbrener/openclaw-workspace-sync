@@ -42,15 +42,15 @@ Drop a file locally — it appears on the remote Gateway (and vice versa).
 │         workspace-sync plugin           │
 │                                         │
 │  ┌─────────────┐  ┌──────────────────┐  │
-│  │ CLI Commands │  │  Session Hooks   │  │
-│  │ setup/sync/  │  │  auto-sync on    │  │
-│  │ status/auth  │  │  start/end       │  │
+│  │ CLI Commands│  │  Session Hooks   │  │
+│  │ setup/sync/ │  │  auto-sync on    │  │
+│  │ status/auth │  │  start/end       │  │
 │  └──────┬──────┘  └────────┬─────────┘  │
 │         │                  │            │
 │         │  ┌───────────────────────┐    │
-│         │  │ Background Sync Mgr  │    │
+│         │  │ Background Sync Mgr   │    │
 │         │  │ interval-based bisync │    │
-│         │  └───────────┬──────────┘    │
+│         │  └───────────┬──────────_┘    │
 │         │              │               │
 │         ▼              ▼               │
 │  ┌─────────────────────────────────┐   │
@@ -100,7 +100,7 @@ Add to your `openclaw.json`:
 {
   "plugins": {
     "entries": {
-      "workspace-sync": {
+      "openclaw-workspace-sync": {
         "enabled": true,
         "config": {
           "provider": "dropbox",

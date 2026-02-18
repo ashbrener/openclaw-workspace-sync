@@ -38,7 +38,7 @@ function parsePluginConfig(raw: Record<string, unknown> | undefined): WorkspaceS
 }
 
 const workspaceSyncPlugin = {
-  id: "workspace-sync",
+  id: "openclaw-workspace-sync",
   name: "Workspace Cloud Sync",
   description:
     "Bidirectional workspace sync with cloud storage (Dropbox, Google Drive, S3, OneDrive, 70+ providers) via rclone",
@@ -637,7 +637,7 @@ const workspaceSyncPlugin = {
     // ========================================================================
 
     api.registerService({
-      id: "workspace-sync",
+      id: "openclaw-workspace-sync",
       start: (ctx) => {
         if (!syncConfig.provider || syncConfig.provider === "off") {
           api.logger.info("[workspace-sync] service: sync not configured, idle");
