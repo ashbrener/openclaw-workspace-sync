@@ -37,4 +37,18 @@ export type WorkspaceSyncConfig = {
     appSecret?: string;
     token?: string;
   };
+  gdrive?: {
+    token?: string;
+    teamDrive?: string;
+    rootFolderId?: string;
+  };
+  onedrive?: {
+    token?: string;
+    driveId?: string;
+    driveType?: "personal" | "business" | "sharepoint";
+  };
+  custom?: {
+    rcloneType: string;
+    rcloneOptions?: Record<string, string>;
+  };
 };

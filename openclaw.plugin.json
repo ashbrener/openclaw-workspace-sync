@@ -65,6 +65,40 @@
     "s3.secretAccessKey": {
       "label": "S3 Secret Access Key",
       "sensitive": true
+    },
+    "gdrive.token": {
+      "label": "Google Drive OAuth Token",
+      "sensitive": true,
+      "help": "OAuth token JSON from rclone authorize or openclaw workspace authorize"
+    },
+    "gdrive.teamDrive": {
+      "label": "Team Drive ID",
+      "help": "ID of the Shared Drive (leave empty for personal drive)",
+      "advanced": true
+    },
+    "gdrive.rootFolderId": {
+      "label": "Root Folder ID",
+      "help": "ID of a specific folder to use as root",
+      "advanced": true
+    },
+    "onedrive.token": {
+      "label": "OneDrive OAuth Token",
+      "sensitive": true,
+      "help": "OAuth token JSON from rclone authorize or openclaw workspace authorize"
+    },
+    "onedrive.driveId": {
+      "label": "Drive ID",
+      "help": "Specific drive ID (leave empty for default)",
+      "advanced": true
+    },
+    "custom.rcloneType": {
+      "label": "rclone Backend Type",
+      "help": "Any rclone backend type (e.g., b2, sftp, mega, pcloud)"
+    },
+    "custom.rcloneOptions": {
+      "label": "rclone Options",
+      "help": "Key-value pairs passed directly to rclone config",
+      "advanced": true
     }
   },
   "configSchema": {
@@ -159,6 +193,52 @@
             "type": "string"
           }
         }
+      },
+      "gdrive": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "teamDrive": {
+            "type": "string"
+          },
+          "rootFolderId": {
+            "type": "string"
+          }
+        }
+      },
+      "onedrive": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "driveId": {
+            "type": "string"
+          },
+          "driveType": {
+            "type": "string",
+            "enum": ["personal", "business", "sharepoint"]
+          }
+        }
+      },
+      "custom": {
+        "type": "object",
+        "properties": {
+          "rcloneType": {
+            "type": "string"
+          },
+          "rcloneOptions": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "required": ["rcloneType"]
       }
     }
   }

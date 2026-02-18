@@ -56,4 +56,43 @@ describe("workspace-sync types", () => {
     expect(config.provider).toBe("s3");
     expect(config.s3?.endpoint).toBe("https://r2.example.com");
   });
+
+  it("WorkspaceSyncConfig accepts gdrive config", () => {
+    const config: WorkspaceSyncConfig = {
+      provider: "gdrive",
+      gdrive: {
+        token: '{"access_token":"gd123"}',
+        teamDrive: "0ABcDeFg",
+        rootFolderId: "folder123",
+      },
+    };
+    expect(config.provider).toBe("gdrive");
+    expect(config.gdrive?.teamDrive).toBe("0ABcDeFg");
+  });
+
+  it("WorkspaceSyncConfig accepts onedrive config", () => {
+    const config: WorkspaceSyncConfig = {
+      provider: "onedrive",
+      onedrive: {
+        token: '{"access_token":"od123"}',
+        driveId: "drive-abc",
+        driveType: "business",
+      },
+    };
+    expect(config.provider).toBe("onedrive");
+    expect(config.onedrive?.driveType).toBe("business");
+  });
+
+  it("WorkspaceSyncConfig accepts custom provider config", () => {
+    const config: WorkspaceSyncConfig = {
+      provider: "custom",
+      custom: {
+        rcloneType: "sftp",
+        rcloneOptions: { host: "example.com", user: "deploy" },
+      },
+    };
+    expect(config.provider).toBe("custom");
+    expect(config.custom?.rcloneType).toBe("sftp");
+    expect(config.custom?.rcloneOptions?.host).toBe("example.com");
+  });
 });

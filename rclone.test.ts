@@ -273,5 +273,112 @@ describe("rclone helpers", () => {
       expect(content).toContain("access_key_id = AKID123");
       expect(content).toContain("secret_access_key = SECRET456");
     });
+
+    it("returns false when gdrive has no token", () => {
+      const result = ensureRcloneConfigFromConfig(
+        { provider: "gdrive", gdrive: { teamDrive: "abc" } },
+        configPath,
+        "cloud",
+      );
+      expect(result).toBe(false);
+    });
+
+    it("generates config when gdrive has token", () => {
+      const result = ensureRcloneConfigFromConfig(
+        {
+          provider: "gdrive",
+          gdrive: {
+            token: '{"access_token":"gd-test"}',
+            teamDrive: "0ABcDeFgHiJ",
+          },
+        },
+        configPath,
+        "cloud",
+      );
+
+      expect(result).toBe(true);
+      const content = fs.readFileSync(configPath, "utf-8");
+      expect(content).toContain("[cloud]");
+      expect(content).toContain("type = drive");
+      expect(content).toContain('token = {"access_token":"gd-test"}');
+      expect(content).toContain("team_drive = 0ABcDeFgHiJ");
+    });
+
+    it("generates gdrive config without optional fields", () => {
+      const result = ensureRcloneConfigFromConfig(
+        { provider: "gdrive", gdrive: { token: '{"access_token":"minimal"}' } },
+        configPath,
+        "cloud",
+      );
+
+      expect(result).toBe(true);
+      const content = fs.readFileSync(configPath, "utf-8");
+      expect(content).toContain("type = drive");
+      expect(content).not.toContain("team_drive");
+      expect(content).not.toContain("root_folder_id");
+    });
+
+    it("returns false when onedrive has no token", () => {
+      const result = ensureRcloneConfigFromConfig(
+        { provider: "onedrive", onedrive: { driveId: "abc" } },
+        configPath,
+        "cloud",
+      );
+      expect(result).toBe(false);
+    });
+
+    it("generates config when onedrive has token", () => {
+      const result = ensureRcloneConfigFromConfig(
+        {
+          provider: "onedrive",
+          onedrive: {
+            token: '{"access_token":"od-test"}',
+            driveId: "drive123",
+            driveType: "business",
+          },
+        },
+        configPath,
+        "cloud",
+      );
+
+      expect(result).toBe(true);
+      const content = fs.readFileSync(configPath, "utf-8");
+      expect(content).toContain("[cloud]");
+      expect(content).toContain("type = onedrive");
+      expect(content).toContain('token = {"access_token":"od-test"}');
+      expect(content).toContain("drive_id = drive123");
+      expect(content).toContain("drive_type = business");
+    });
+
+    it("returns false when custom has no rcloneType", () => {
+      const result = ensureRcloneConfigFromConfig(
+        { provider: "custom", custom: { rcloneType: "" } },
+        configPath,
+        "cloud",
+      );
+      expect(result).toBe(false);
+    });
+
+    it("generates config for custom provider", () => {
+      const result = ensureRcloneConfigFromConfig(
+        {
+          provider: "custom",
+          custom: {
+            rcloneType: "sftp",
+            rcloneOptions: { host: "example.com", user: "deploy", port: "22" },
+          },
+        },
+        configPath,
+        "cloud",
+      );
+
+      expect(result).toBe(true);
+      const content = fs.readFileSync(configPath, "utf-8");
+      expect(content).toContain("[cloud]");
+      expect(content).toContain("type = sftp");
+      expect(content).toContain("host = example.com");
+      expect(content).toContain("user = deploy");
+      expect(content).toContain("port = 22");
+    });
   });
 });

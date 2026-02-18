@@ -148,6 +148,38 @@ Default excludes: `.git/**`, `node_modules/**`, `.venv/**`, `__pycache__/**`, `*
 }
 ```
 
+**Google Drive:**
+
+```json
+{
+  "provider": "gdrive",
+  "remotePath": "openclaw-sync",
+  "gdrive": {
+    "token": "{\"access_token\":\"...\"}",
+    "teamDrive": "0ABcDeFgHiJ",
+    "rootFolderId": "folder-id"
+  }
+}
+```
+
+`teamDrive` and `rootFolderId` are optional — omit them for personal Google Drive.
+
+**OneDrive:**
+
+```json
+{
+  "provider": "onedrive",
+  "remotePath": "openclaw-sync",
+  "onedrive": {
+    "token": "{\"access_token\":\"...\"}",
+    "driveId": "drive-id",
+    "driveType": "business"
+  }
+}
+```
+
+`driveType` can be `personal`, `business`, or `sharepoint`. Both fields are optional.
+
 **S3 / Cloudflare R2 / Minio:**
 
 ```json
@@ -163,6 +195,25 @@ Default excludes: `.git/**`, `node_modules/**`, `.venv/**`, `__pycache__/**`, `*
   }
 }
 ```
+
+**Any rclone backend (SFTP, B2, Mega, pCloud, etc.):**
+
+```json
+{
+  "provider": "custom",
+  "remotePath": "openclaw-sync",
+  "custom": {
+    "rcloneType": "sftp",
+    "rcloneOptions": {
+      "host": "example.com",
+      "user": "deploy",
+      "key_file": "/path/to/key"
+    }
+  }
+}
+```
+
+The `custom` provider accepts any [rclone backend type](https://rclone.org/overview/) and passes `rcloneOptions` directly to the rclone config. This gives you config-driven access to all 70+ providers without manually editing `rclone.conf`.
 
 ## CLI commands
 
@@ -228,15 +279,15 @@ The gateway runs rclone bisync in the background at this interval. Minimum inter
 
 ## Supported providers
 
-| Provider | Config value | Auth method |
-|----------|-------------|-------------|
-| Dropbox | `dropbox` | OAuth token |
-| Google Drive | `gdrive` | OAuth token |
-| OneDrive | `onedrive` | OAuth token |
-| S3/R2/Minio | `s3` | Access keys |
-| Custom rclone | `custom` | Manual rclone config |
+| Provider | Config value | Auth method | Config-driven |
+|----------|-------------|-------------|---------------|
+| Dropbox | `dropbox` | OAuth token | Full (token, appKey, appSecret, appFolder) |
+| Google Drive | `gdrive` | OAuth token | Full (token, teamDrive, rootFolderId) |
+| OneDrive | `onedrive` | OAuth token | Full (token, driveId, driveType) |
+| S3/R2/Minio | `s3` | Access keys | Full (endpoint, bucket, region, credentials) |
+| Any rclone backend | `custom` | Varies | Full (rcloneType + rcloneOptions) |
 
-For the full list of 70+ providers, see [rclone overview](https://rclone.org/overview/).
+All providers are fully config-driven — no manual `rclone.conf` editing needed. The `custom` provider gives access to all [70+ rclone backends](https://rclone.org/overview/) (SFTP, B2, Mega, pCloud, Azure Blob, etc.).
 
 ## Manual setup (without wizard)
 

@@ -259,8 +259,21 @@ export function generateRcloneConfig(
       accessKeyId?: string;
       secretAccessKey?: string;
     };
+    gdrive?: { teamDrive?: string; rootFolderId?: string };
+    onedrive?: { driveId?: string; driveType?: string };
+    custom?: { rcloneType: string; rcloneOptions?: Record<string, string> };
   },
 ): string {
+  if (provider === "custom" && options?.custom) {
+    let config = `[${remoteName}]\ntype = ${options.custom.rcloneType}\n`;
+    if (options.custom.rcloneOptions) {
+      for (const [k, v] of Object.entries(options.custom.rcloneOptions)) {
+        config += `${k} = ${v}\n`;
+      }
+    }
+    return config;
+  }
+
   const type = getRcloneType(provider);
   let config = `[${remoteName}]\ntype = ${type}\n`;
 
@@ -270,8 +283,12 @@ export function generateRcloneConfig(
     if (options?.dropbox?.appSecret) config += `client_secret = ${options.dropbox.appSecret}\n`;
   } else if (provider === "gdrive") {
     config += `token = ${token}\n`;
+    if (options?.gdrive?.teamDrive) config += `team_drive = ${options.gdrive.teamDrive}\n`;
+    if (options?.gdrive?.rootFolderId) config += `root_folder_id = ${options.gdrive.rootFolderId}\n`;
   } else if (provider === "onedrive") {
     config += `token = ${token}\n`;
+    if (options?.onedrive?.driveId) config += `drive_id = ${options.onedrive.driveId}\n`;
+    if (options?.onedrive?.driveType) config += `drive_type = ${options.onedrive.driveType}\n`;
   } else if (provider === "s3") {
     if (options?.s3?.endpoint) config += `endpoint = ${options.s3.endpoint}\n`;
     if (options?.s3?.region) config += `region = ${options.s3.region}\n`;
@@ -320,12 +337,45 @@ export function ensureRcloneConfigFromConfig(
     return true;
   }
 
+  if (syncConfig.provider === "gdrive") {
+    const token = syncConfig.gdrive?.token;
+    if (!token) return false;
+    logVerbose(`[rclone] Auto-generating config for ${remoteName} from plugin config`);
+    const configContent = generateRcloneConfig(syncConfig.provider, remoteName, token, {
+      gdrive: { teamDrive: syncConfig.gdrive?.teamDrive, rootFolderId: syncConfig.gdrive?.rootFolderId },
+    });
+    writeRcloneConfig(configPath, configContent);
+    return true;
+  }
+
+  if (syncConfig.provider === "onedrive") {
+    const token = syncConfig.onedrive?.token;
+    if (!token) return false;
+    logVerbose(`[rclone] Auto-generating config for ${remoteName} from plugin config`);
+    const configContent = generateRcloneConfig(syncConfig.provider, remoteName, token, {
+      onedrive: { driveId: syncConfig.onedrive?.driveId, driveType: syncConfig.onedrive?.driveType },
+    });
+    writeRcloneConfig(configPath, configContent);
+    return true;
+  }
+
   if (syncConfig.provider === "s3") {
     const { accessKeyId, secretAccessKey, endpoint, bucket, region } = syncConfig.s3 ?? {};
     if (!accessKeyId || !secretAccessKey) return false;
     logVerbose(`[rclone] Auto-generating config for ${remoteName} from plugin config`);
     const configContent = generateRcloneConfig(syncConfig.provider, remoteName, "", {
       s3: { endpoint, bucket, region, accessKeyId, secretAccessKey },
+    });
+    writeRcloneConfig(configPath, configContent);
+    return true;
+  }
+
+  if (syncConfig.provider === "custom") {
+    const customCfg = syncConfig.custom;
+    if (!customCfg?.rcloneType) return false;
+    logVerbose(`[rclone] Auto-generating config for ${remoteName} from custom rclone config`);
+    const configContent = generateRcloneConfig(syncConfig.provider, remoteName, "", {
+      custom: { rcloneType: customCfg.rcloneType, rcloneOptions: customCfg.rcloneOptions },
     });
     writeRcloneConfig(configPath, configContent);
     return true;
