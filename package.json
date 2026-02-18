@@ -1,0 +1,44 @@
+{
+  "name": "openclaw-workspace-sync",
+  "version": "2026.2.9",
+  "description": "Bidirectional workspace cloud sync via rclone (Dropbox, Google Drive, S3, OneDrive, 70+ providers)",
+  "type": "module",
+  "license": "MIT",
+  "author": "ashbrener",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ashbrener/openclaw-workspace-sync.git"
+  },
+  "keywords": [
+    "openclaw",
+    "openclaw-plugin",
+    "workspace",
+    "sync",
+    "rclone",
+    "dropbox",
+    "google-drive",
+    "s3",
+    "cloud-storage",
+    "backup"
+  ],
+  "dependencies": {
+    "@clack/prompts": "^1.0.1"
+  },
+  "peerDependencies": {
+    "openclaw": ">=2026.1.0"
+  },
+  "devDependencies": {
+    "openclaw": "latest",
+    "vitest": "^3.0.0",
+    "typescript": "^5.7.0"
+  },
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  }
+}

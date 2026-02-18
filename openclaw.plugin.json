@@ -1,0 +1,134 @@
+{
+  "id": "workspace-sync",
+  "uiHints": {
+    "provider": {
+      "label": "Cloud Provider",
+      "help": "Cloud storage provider for workspace sync"
+    },
+    "remotePath": {
+      "label": "Remote Path",
+      "placeholder": "openclaw-share",
+      "help": "Folder name in cloud storage"
+    },
+    "localPath": {
+      "label": "Local Path",
+      "placeholder": "shared",
+      "help": "Subfolder within workspace to sync",
+      "advanced": true
+    },
+    "interval": {
+      "label": "Sync Interval (seconds)",
+      "placeholder": "0",
+      "help": "Background sync interval (0 = manual only). Pure file sync, zero LLM cost."
+    },
+    "onSessionStart": {
+      "label": "Sync on Session Start",
+      "help": "Automatically sync when an agent session begins"
+    },
+    "onSessionEnd": {
+      "label": "Sync on Session End",
+      "help": "Automatically sync when an agent session ends"
+    },
+    "remoteName": {
+      "label": "rclone Remote Name",
+      "placeholder": "cloud",
+      "advanced": true
+    },
+    "configPath": {
+      "label": "rclone Config Path",
+      "advanced": true,
+      "help": "Path to rclone.conf (auto-detected if omitted)"
+    },
+    "conflictResolve": {
+      "label": "Conflict Resolution",
+      "help": "How to resolve file conflicts during bisync"
+    },
+    "dropbox.token": {
+      "label": "Dropbox OAuth Token",
+      "sensitive": true,
+      "help": "OAuth token JSON from rclone authorize (or use ${DROPBOX_TOKEN})"
+    },
+    "dropbox.appKey": {
+      "label": "Dropbox App Key",
+      "sensitive": true,
+      "help": "App key for scoped Dropbox access"
+    },
+    "dropbox.appSecret": {
+      "label": "Dropbox App Secret",
+      "sensitive": true,
+      "help": "App secret for scoped Dropbox access"
+    },
+    "s3.accessKeyId": {
+      "label": "S3 Access Key ID",
+      "sensitive": true
+    },
+    "s3.secretAccessKey": {
+      "label": "S3 Secret Access Key",
+      "sensitive": true
+    }
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "provider": {
+        "type": "string",
+        "enum": ["off", "dropbox", "gdrive", "onedrive", "s3", "custom"]
+      },
+      "remotePath": {
+        "type": "string"
+      },
+      "localPath": {
+        "type": "string"
+      },
+      "interval": {
+        "type": "number",
+        "minimum": 0
+      },
+      "onSessionStart": {
+        "type": "boolean"
+      },
+      "onSessionEnd": {
+        "type": "boolean"
+      },
+      "remoteName": {
+        "type": "string"
+      },
+      "configPath": {
+        "type": "string"
+      },
+      "conflictResolve": {
+        "type": "string",
+        "enum": ["newer", "local", "remote"]
+      },
+      "exclude": {
+        "type": "array",
+        "items": { "type": "string" }
+      },
+      "copySymlinks": {
+        "type": "boolean"
+      },
+      "s3": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "endpoint": { "type": "string" },
+          "bucket": { "type": "string" },
+          "region": { "type": "string" },
+          "accessKeyId": { "type": "string" },
+          "secretAccessKey": { "type": "string" }
+        }
+      },
+      "dropbox": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "appFolder": { "type": "boolean" },
+          "appKey": { "type": "string" },
+          "appSecret": { "type": "string" },
+          "token": { "type": "string" }
+        }
+      }
+    }
+  }
+}
