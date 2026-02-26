@@ -104,8 +104,13 @@ async function doSync(): Promise<void> {
       resync: needsResync,
     });
 
-    if (!result.ok && result.error?.includes("--resync") && !needsResync) {
-      logger.info("[workspace-sync] First-time sync detected, running with --resync");
+    if (!result.ok && result.error?.includes("--resync")) {
+      logger.info(
+        needsResync
+          ? "[workspace-sync] Bisync aborted and needs resync recovery, retrying"
+          : "[workspace-sync] First-time sync detected, running with --resync",
+      );
+      state.hasSuccessfulSync = false;
       result = await runBisync({
         configPath: resolved.configPath,
         remoteName: resolved.remoteName,
@@ -129,6 +134,10 @@ async function doSync(): Promise<void> {
       state.lastSyncOk = false;
       state.errorCount++;
       logger.warn(`[workspace-sync] Periodic sync failed: ${result.error}`);
+
+      if (result.error?.includes("Must run --resync") || result.error?.includes("Bisync aborted")) {
+        state.hasSuccessfulSync = false;
+      }
 
       if (result.error?.includes("lock file found") || result.error?.includes(".lck")) {
         logger.info("[workspace-sync] Clearing lock file for next sync attempt");
