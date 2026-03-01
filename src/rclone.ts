@@ -6,7 +6,7 @@
  */
 
 import { execFile } from "node:child_process";
-import { existsSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, unlinkSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { homedir, platform } from "node:os";
 import type { WorkspaceSyncConfig, WorkspaceSyncProvider } from "./types.js";
@@ -422,6 +422,28 @@ export async function authorizeRclone(
 }
 
 // ============================================================================
+// Lock file management
+// ============================================================================
+
+export function clearBisyncLocks(): void {
+  const lockDir = join(homedir(), ".cache", "rclone", "bisync");
+  try {
+    if (!existsSync(lockDir)) return;
+    const files = readdirSync(lockDir);
+    for (const f of files.filter((name) => name.endsWith(".lck"))) {
+      try {
+        unlinkSync(join(lockDir, f));
+        logVerbose(`Cleared stale lock: ${f}`);
+      } catch {
+        // ignore
+      }
+    }
+  } catch {
+    // lock dir doesn't exist
+  }
+}
+
+// ============================================================================
 // Sync operations
 // ============================================================================
 
@@ -464,30 +486,52 @@ export async function runBisync(params: {
 
   logVerbose(`Running: ${rcloneBin} ${args.join(" ")}`);
 
-  try {
-    const { stdout, stderr } = await runExec(rcloneBin, args, {
-      timeoutMs: 600_000,
-      maxBuffer: 10_000_000,
-    });
+  const attempt = async (
+    attemptArgs: string[],
+  ): Promise<RcloneSyncResult> => {
+    try {
+      const { stdout, stderr } = await runExec(rcloneBin, attemptArgs, {
+        timeoutMs: 600_000,
+        maxBuffer: 10_000_000,
+      });
 
-    const combined = stdout + stderr;
-    const transferredMatch = combined.match(/Transferred:\s*(\d+)\s*\/\s*(\d+)/);
+      const combined = stdout + stderr;
+      const transferredMatch = combined.match(/Transferred:\s*(\d+)\s*\/\s*(\d+)/);
 
-    return {
-      ok: true,
-      filesTransferred: transferredMatch ? parseInt(transferredMatch[1], 10) : undefined,
-    };
-  } catch (err) {
-    const errObj = err as { stdout?: string; stderr?: string; message?: string };
-    const message =
-      errObj.stderr?.trim() || errObj.stdout?.trim() || errObj.message || "Unknown sync error";
+      return {
+        ok: true,
+        filesTransferred: transferredMatch ? parseInt(transferredMatch[1], 10) : undefined,
+      };
+    } catch (err) {
+      const errObj = err as { stdout?: string; stderr?: string; message?: string };
+      const message =
+        errObj.stderr?.trim() || errObj.stdout?.trim() || errObj.message || "Unknown sync error";
 
-    if (message.includes("bisync requires --resync")) {
-      return { ok: false, error: "First sync requires --resync flag to establish baseline" };
+      if (message.includes("bisync requires --resync")) {
+        return { ok: false, error: "First sync requires --resync flag to establish baseline" };
+      }
+
+      return { ok: false, error: message };
     }
+  };
 
-    return { ok: false, error: message };
+  let result = await attempt(args);
+
+  // Auto-clear stale lock files and retry
+  if (!result.ok && (result.error?.includes("lock file found") || result.error?.includes(".lck"))) {
+    logVerbose("Stale lock file detected, clearing and retrying");
+    clearBisyncLocks();
+    result = await attempt(args);
   }
+
+  // Auto-retry with --resync when bisync requires it
+  if (!result.ok && !params.resync && (result.error?.includes("--resync") || result.error?.includes("Must run --resync") || result.error?.includes("Bisync aborted"))) {
+    logVerbose("Bisync requires --resync, retrying automatically");
+    const resyncArgs = [...args, "--resync"];
+    result = await attempt(resyncArgs);
+  }
+
+  return result;
 }
 
 export async function runSync(params: {

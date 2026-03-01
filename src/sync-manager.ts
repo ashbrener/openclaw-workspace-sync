@@ -5,9 +5,6 @@
  * Pure file operation, zero token cost.
  */
 
-import { existsSync, readdirSync, unlinkSync } from "node:fs";
-import { join } from "node:path";
-import { homedir } from "node:os";
 import type { WorkspaceSyncConfig } from "./types.js";
 import {
   isRcloneInstalled,
@@ -15,6 +12,7 @@ import {
   ensureRcloneConfigFromConfig,
   resolveSyncConfig,
   runBisync,
+  clearBisyncLocks,
 } from "./rclone.js";
 
 type Logger = {
@@ -91,9 +89,7 @@ async function doSync(): Promise<void> {
       `[workspace-sync] Running periodic sync: ${resolved.remoteName}:${resolved.remotePath}`,
     );
 
-    const needsResync = !state.hasSuccessfulSync;
-
-    let result = await runBisync({
+    const result = await runBisync({
       configPath: resolved.configPath,
       remoteName: resolved.remoteName,
       remotePath: resolved.remotePath,
@@ -101,27 +97,8 @@ async function doSync(): Promise<void> {
       conflictResolve: resolved.conflictResolve,
       exclude: resolved.exclude,
       copySymlinks: resolved.copySymlinks,
-      resync: needsResync,
+      resync: !state.hasSuccessfulSync,
     });
-
-    if (!result.ok && result.error?.includes("--resync")) {
-      logger.info(
-        needsResync
-          ? "[workspace-sync] Bisync aborted and needs resync recovery, retrying"
-          : "[workspace-sync] First-time sync detected, running with --resync",
-      );
-      state.hasSuccessfulSync = false;
-      result = await runBisync({
-        configPath: resolved.configPath,
-        remoteName: resolved.remoteName,
-        remotePath: resolved.remotePath,
-        localPath: resolved.localPath,
-        conflictResolve: resolved.conflictResolve,
-        exclude: resolved.exclude,
-        copySymlinks: resolved.copySymlinks,
-        resync: true,
-      });
-    }
 
     state.lastSyncAt = new Date();
     state.syncCount++;
@@ -133,16 +110,8 @@ async function doSync(): Promise<void> {
     } else {
       state.lastSyncOk = false;
       state.errorCount++;
+      state.hasSuccessfulSync = false;
       logger.warn(`[workspace-sync] Periodic sync failed: ${result.error}`);
-
-      if (result.error?.includes("Must run --resync") || result.error?.includes("Bisync aborted")) {
-        state.hasSuccessfulSync = false;
-      }
-
-      if (result.error?.includes("lock file found") || result.error?.includes(".lck")) {
-        logger.info("[workspace-sync] Clearing lock file for next sync attempt");
-        clearStaleLocks(logger);
-      }
     }
   } catch (err) {
     state.lastSyncOk = false;
@@ -153,23 +122,6 @@ async function doSync(): Promise<void> {
   }
 }
 
-function clearStaleLocks(logger: Logger): void {
-  const lockDir = join(homedir(), ".cache", "rclone", "bisync");
-  try {
-    if (!existsSync(lockDir)) return;
-    const files = readdirSync(lockDir);
-    for (const f of files.filter((f) => f.endsWith(".lck"))) {
-      try {
-        unlinkSync(join(lockDir, f));
-        logger.info(`[workspace-sync] Cleared stale lock: ${f}`);
-      } catch {
-        // ignore
-      }
-    }
-  } catch {
-    // lock dir doesn't exist
-  }
-}
 
 export function startSyncManager(
   syncConfig: WorkspaceSyncConfig,
@@ -189,7 +141,7 @@ export function startSyncManager(
     return;
   }
 
-  clearStaleLocks(logger);
+  clearBisyncLocks();
 
   const intervalSeconds = syncConfig.interval ?? 0;
   if (intervalSeconds <= 0) {
