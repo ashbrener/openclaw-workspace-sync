@@ -51,7 +51,7 @@ describe("workspace-sync plugin", () => {
     workspaceSyncPlugin.register(api as any);
 
     expect(registerCli).toHaveBeenCalledTimes(1);
-    expect(registerCli).toHaveBeenCalledWith(expect.any(Function), { commands: ["workspace"] });
+    expect(registerCli).toHaveBeenCalledWith(expect.any(Function), { commands: ["workspace-sync"] });
 
     expect(registerService).toHaveBeenCalledTimes(1);
     expect(registerService).toHaveBeenCalledWith(

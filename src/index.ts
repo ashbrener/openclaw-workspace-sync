@@ -5,7 +5,7 @@
  * Supports Dropbox, Google Drive, S3, OneDrive, and 70+ providers.
  *
  * Features:
- * - CLI commands: openclaw workspace sync/status/setup/authorize/list
+ * - CLI commands: openclaw workspace-sync sync/status/setup/authorize/list
  * - Background periodic sync (pure rclone, zero LLM cost)
  * - Session start/end hooks for automatic sync
  * - Config-driven rclone setup (no manual rclone config needed)
@@ -58,10 +58,10 @@ const workspaceSyncPlugin = {
     api.registerCli(
       ({ program, workspaceDir }) => {
         const workspace = program
-          .command("workspace")
-          .description("Workspace management and cloud sync");
+          .command("workspace-sync")
+          .description("Workspace cloud sync via rclone");
 
-        // openclaw workspace sync
+        // openclaw workspace-sync sync
         workspace
           .command("sync")
           .description("Sync workspace with cloud storage")
@@ -83,14 +83,14 @@ const workspaceSyncPlugin = {
 
               if (!cfgSync.provider || cfgSync.provider === "off") {
                 console.error("Workspace sync not configured.");
-                console.error("Run: openclaw workspace setup");
+                console.error("Run: openclaw workspace-sync setup");
                 process.exit(1);
               }
 
               const installed = await isRcloneInstalled();
               if (!installed) {
                 console.error("rclone not installed.");
-                console.error("Run: openclaw workspace setup");
+                console.error("Run: openclaw workspace-sync setup");
                 process.exit(1);
               }
 
@@ -100,7 +100,7 @@ const workspaceSyncPlugin = {
 
               if (!isRcloneConfigured(resolved.configPath, resolved.remoteName)) {
                 console.error(`rclone not configured for remote "${resolved.remoteName}".`);
-                console.error("Run: openclaw workspace authorize");
+                console.error("Run: openclaw workspace-sync authorize");
                 process.exit(1);
               }
 
@@ -143,14 +143,14 @@ const workspaceSyncPlugin = {
               } else {
                 console.error(`Sync failed: ${(result as any).error}`);
                 if ((result as any).error?.includes("--resync")) {
-                  console.error("First sync requires --resync: openclaw workspace sync --resync");
+                  console.error("First sync requires --resync: openclaw workspace-sync sync --resync");
                 }
                 process.exit(1);
               }
             },
           );
 
-        // openclaw workspace status
+        // openclaw workspace-sync status
         workspace
           .command("status")
           .description("Show workspace sync status")
@@ -165,7 +165,7 @@ const workspaceSyncPlugin = {
 
             if (!cfgSync.provider || cfgSync.provider === "off") {
               console.log("Provider: not configured");
-              console.log("Configure in openclaw.json plugins.entries.workspace-sync.config");
+              console.log("Configure in openclaw.json plugins.entries.openclaw-workspace-sync.config");
               return;
             }
 
@@ -189,7 +189,7 @@ const workspaceSyncPlugin = {
             const configured = isRcloneConfigured(resolved.configPath, resolved.remoteName);
             if (!configured) {
               console.log("rclone config: NOT configured");
-              console.log("Run: openclaw workspace authorize");
+              console.log("Run: openclaw workspace-sync authorize");
               return;
             }
             console.log("rclone config: OK");
@@ -244,7 +244,7 @@ const workspaceSyncPlugin = {
             }
           });
 
-        // openclaw workspace setup — interactive wizard
+        // openclaw workspace-sync setup — interactive wizard
         workspace
           .command("setup")
           .description("Interactive setup wizard for cloud sync")
@@ -346,7 +346,7 @@ const workspaceSyncPlugin = {
             const intervalChoice = (await clack.select({
               message: "Background sync interval",
               options: [
-                { value: "0", label: "Manual only", hint: "Run 'openclaw workspace sync' when needed" },
+                { value: "0", label: "Manual only", hint: "Run 'openclaw workspace-sync sync' when needed" },
                 { value: "300", label: "Every 5 minutes", hint: "Recommended" },
                 { value: "600", label: "Every 10 minutes" },
                 { value: "1800", label: "Every 30 minutes" },
@@ -376,7 +376,7 @@ const workspaceSyncPlugin = {
 
             if (!authResult.ok) {
               clack.log.error(`Authorization failed: ${(authResult as any).error}`);
-              clack.outro("Fix the error and run 'openclaw workspace setup' again.");
+              clack.outro("Fix the error and run 'openclaw workspace-sync setup' again.");
               process.exit(1);
               return;
             }
@@ -414,10 +414,10 @@ const workspaceSyncPlugin = {
               "Plugin Configuration",
             );
 
-            clack.outro("Workspace sync configured! Run: openclaw workspace sync --resync");
+            clack.outro("Workspace sync configured! Run: openclaw workspace-sync sync --resync");
           });
 
-        // openclaw workspace authorize
+        // openclaw workspace-sync authorize
         workspace
           .command("authorize")
           .description("Authorize rclone with cloud provider")
@@ -472,11 +472,11 @@ const workspaceSyncPlugin = {
               writeRcloneConfig(configPath, configContent);
               console.log(`Config saved to: ${configPath}`);
               console.log("");
-              console.log("Next: openclaw workspace sync --resync");
+              console.log("Next: openclaw workspace-sync sync --resync");
             },
           );
 
-        // openclaw workspace list
+        // openclaw workspace-sync list
         workspace
           .command("list")
           .description("List files in remote storage")
@@ -496,7 +496,7 @@ const workspaceSyncPlugin = {
 
             if (!isRcloneConfigured(resolved.configPath, resolved.remoteName)) {
               console.error("rclone not configured.");
-              console.error("Run: openclaw workspace authorize");
+              console.error("Run: openclaw workspace-sync authorize");
               process.exit(1);
             }
 
@@ -523,7 +523,7 @@ const workspaceSyncPlugin = {
             console.log(`\n${(result as any).files.length} files`);
           });
       },
-      { commands: ["workspace"] },
+      { commands: ["workspace-sync"] },
     );
 
     // ========================================================================
@@ -576,7 +576,7 @@ const workspaceSyncPlugin = {
             api.logger.info("[workspace-sync] session start sync completed");
           } else if ((result as any).error?.includes("--resync")) {
             api.logger.warn(
-              "[workspace-sync] first sync requires manual --resync. Run: openclaw workspace sync --resync",
+              "[workspace-sync] first sync requires manual --resync. Run: openclaw workspace-sync sync --resync",
             );
           } else {
             api.logger.error(`[workspace-sync] sync failed: ${(result as any).error}`);

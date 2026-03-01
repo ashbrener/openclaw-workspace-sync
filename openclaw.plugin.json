@@ -69,7 +69,7 @@
     "gdrive.token": {
       "label": "Google Drive OAuth Token",
       "sensitive": true,
-      "help": "OAuth token JSON from rclone authorize or openclaw workspace authorize"
+      "help": "OAuth token JSON from rclone authorize or openclaw workspace-sync authorize"
     },
     "gdrive.teamDrive": {
       "label": "Team Drive ID",
@@ -84,7 +84,7 @@
     "onedrive.token": {
       "label": "OneDrive OAuth Token",
       "sensitive": true,
-      "help": "OAuth token JSON from rclone authorize or openclaw workspace authorize"
+      "help": "OAuth token JSON from rclone authorize or openclaw workspace-sync authorize"
     },
     "onedrive.driveId": {
       "label": "Drive ID",

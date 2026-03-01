@@ -38,7 +38,7 @@ cd workspace-sync && npm install --omit=dev
 
 ```bash
 # Interactive setup wizard (recommended)
-openclaw workspace setup
+openclaw workspace-sync setup
 ```
 
 The setup wizard guides you through:
@@ -183,30 +183,30 @@ The `custom` provider accepts any [rclone backend type](https://rclone.org/overv
 
 ```bash
 # Interactive setup wizard
-openclaw workspace setup
+openclaw workspace-sync setup
 
 # Check sync status
-openclaw workspace status
+openclaw workspace-sync status
 
 # Sync bidirectionally
-openclaw workspace sync
+openclaw workspace-sync sync
 
 # First sync (required once to establish baseline)
-openclaw workspace sync --resync
+openclaw workspace-sync sync --resync
 
 # Preview changes without syncing
-openclaw workspace sync --dry-run
+openclaw workspace-sync sync --dry-run
 
 # One-way sync
-openclaw workspace sync --direction pull   # remote -> local
-openclaw workspace sync --direction push   # local -> remote
+openclaw workspace-sync sync --direction pull   # remote -> local
+openclaw workspace-sync sync --direction push   # local -> remote
 
 # Authorize with cloud provider
-openclaw workspace authorize
-openclaw workspace authorize --provider gdrive
+openclaw workspace-sync authorize
+openclaw workspace-sync authorize --provider gdrive
 
 # List remote files
-openclaw workspace list
+openclaw workspace-sync list
 ```
 
 ## Auto-sync
@@ -238,7 +238,7 @@ The gateway runs rclone bisync in the background at this interval. Minimum inter
 
 ```bash
 # Add to crontab (crontab -e)
-*/5 * * * * openclaw workspace sync >> /var/log/openclaw-sync.log 2>&1
+*/5 * * * * openclaw workspace-sync sync >> /var/log/openclaw-sync.log 2>&1
 ```
 
 ## Supported providers
@@ -259,10 +259,10 @@ If you prefer to skip the interactive wizard, configure the plugin in `openclaw.
 
 ```bash
 # 1. Authorize with your cloud provider
-openclaw workspace authorize --provider dropbox
+openclaw workspace-sync authorize --provider dropbox
 
 # 2. Run the first sync (establishes baseline)
-openclaw workspace sync --resync
+openclaw workspace-sync sync --resync
 ```
 
 The plugin handles rclone installation, config generation, and token storage automatically based on your `openclaw.json` settings.
@@ -289,7 +289,7 @@ Benefits:
 ### Token expired
 
 ```bash
-openclaw workspace authorize
+openclaw workspace-sync authorize
 ```
 
 ### Conflicts
@@ -303,7 +303,7 @@ find <workspace>/shared -name "*.conflict"
 ### First sync fails
 
 ```bash
-openclaw workspace sync --resync
+openclaw workspace-sync sync --resync
 ```
 
 ### Permission errors

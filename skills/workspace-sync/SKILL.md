@@ -20,28 +20,28 @@ Use this skill when the user asks to:
 
 ### Check sync status
 ```bash
-openclaw workspace status
+openclaw workspace-sync status
 ```
 
 Shows: provider, last sync time, sync count, error count, running state.
 
 ### Trigger manual sync
 ```bash
-openclaw workspace sync
+openclaw workspace-sync sync
 ```
 
 Runs a bidirectional sync immediately. Use after bulk workspace changes.
 
 ### First-time sync (required once)
 ```bash
-openclaw workspace sync --resync
+openclaw workspace-sync sync --resync
 ```
 
 Required on first run to establish baseline. Only needed once per remote.
 
 ### View remote files
 ```bash
-openclaw workspace list
+openclaw workspace-sync list
 ```
 
 Lists files in the configured cloud storage path.
@@ -82,13 +82,13 @@ When configured, sync runs automatically:
 ### "rclone not configured"
 Run the setup wizard:
 ```bash
-openclaw workspace setup
+openclaw workspace-sync setup
 ```
 
 ### "requires --resync"
 First sync needs to establish baseline:
 ```bash
-openclaw workspace sync --resync
+openclaw workspace-sync sync --resync
 ```
 
 ### Check rclone directly
