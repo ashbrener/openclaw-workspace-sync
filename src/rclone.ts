@@ -24,7 +24,11 @@ export function setLogger(logger: Logger): void {
   pluginLogger = logger;
 }
 
-function logVerbose(msg: string): void {
+function logInfo(msg: string): void {
+  pluginLogger?.info(msg);
+}
+
+function logDebug(msg: string): void {
   pluginLogger?.debug?.(msg);
 }
 
@@ -145,7 +149,7 @@ export async function ensureRcloneInstalled(
         true,
       );
       if (!install) return false;
-      logVerbose("Installing rclone via Homebrew...");
+      logInfo("Installing rclone via Homebrew...");
       try {
         await runExec("brew", ["install", "rclone"], { timeoutMs: 120_000 });
         cachedRcloneBinary = null;
@@ -165,7 +169,7 @@ export async function ensureRcloneInstalled(
       true,
     );
     if (!install) return false;
-    logVerbose("Installing rclone via official script...");
+    logInfo("Installing rclone via official script...");
     try {
       const { stdout } = await runExec("curl", ["-s", "https://rclone.org/install.sh"], {
         timeoutMs: 30_000,
@@ -329,7 +333,7 @@ export function ensureRcloneConfigFromConfig(
   if (syncConfig.provider === "dropbox") {
     const token = syncConfig.dropbox?.token;
     if (!token) return false;
-    logVerbose(`[rclone] Auto-generating config for ${remoteName} from plugin config`);
+    logDebug(`[rclone] Auto-generating config for ${remoteName} from plugin config`);
     const configContent = generateRcloneConfig(syncConfig.provider, remoteName, token, {
       dropbox: { appKey: syncConfig.dropbox?.appKey, appSecret: syncConfig.dropbox?.appSecret },
     });
@@ -340,7 +344,7 @@ export function ensureRcloneConfigFromConfig(
   if (syncConfig.provider === "gdrive") {
     const token = syncConfig.gdrive?.token;
     if (!token) return false;
-    logVerbose(`[rclone] Auto-generating config for ${remoteName} from plugin config`);
+    logDebug(`[rclone] Auto-generating config for ${remoteName} from plugin config`);
     const configContent = generateRcloneConfig(syncConfig.provider, remoteName, token, {
       gdrive: { teamDrive: syncConfig.gdrive?.teamDrive, rootFolderId: syncConfig.gdrive?.rootFolderId },
     });
@@ -351,7 +355,7 @@ export function ensureRcloneConfigFromConfig(
   if (syncConfig.provider === "onedrive") {
     const token = syncConfig.onedrive?.token;
     if (!token) return false;
-    logVerbose(`[rclone] Auto-generating config for ${remoteName} from plugin config`);
+    logDebug(`[rclone] Auto-generating config for ${remoteName} from plugin config`);
     const configContent = generateRcloneConfig(syncConfig.provider, remoteName, token, {
       onedrive: { driveId: syncConfig.onedrive?.driveId, driveType: syncConfig.onedrive?.driveType },
     });
@@ -362,7 +366,7 @@ export function ensureRcloneConfigFromConfig(
   if (syncConfig.provider === "s3") {
     const { accessKeyId, secretAccessKey, endpoint, bucket, region } = syncConfig.s3 ?? {};
     if (!accessKeyId || !secretAccessKey) return false;
-    logVerbose(`[rclone] Auto-generating config for ${remoteName} from plugin config`);
+    logDebug(`[rclone] Auto-generating config for ${remoteName} from plugin config`);
     const configContent = generateRcloneConfig(syncConfig.provider, remoteName, "", {
       s3: { endpoint, bucket, region, accessKeyId, secretAccessKey },
     });
@@ -373,7 +377,7 @@ export function ensureRcloneConfigFromConfig(
   if (syncConfig.provider === "custom") {
     const customCfg = syncConfig.custom;
     if (!customCfg?.rcloneType) return false;
-    logVerbose(`[rclone] Auto-generating config for ${remoteName} from custom rclone config`);
+    logDebug(`[rclone] Auto-generating config for ${remoteName} from custom rclone config`);
     const configContent = generateRcloneConfig(syncConfig.provider, remoteName, "", {
       custom: { rcloneType: customCfg.rcloneType, rcloneOptions: customCfg.rcloneOptions },
     });
@@ -433,7 +437,7 @@ export function clearBisyncLocks(): void {
     for (const f of files.filter((name) => name.endsWith(".lck"))) {
       try {
         unlinkSync(join(lockDir, f));
-        logVerbose(`Cleared stale lock: ${f}`);
+        logInfo(`[workspace-sync] Cleared stale lock: ${f}`);
       } catch {
         // ignore
       }
@@ -484,7 +488,7 @@ export async function runBisync(params: {
   if (params.verbose) args.push("--verbose");
   else args.push("--log-level", "WARNING");
 
-  logVerbose(`Running: ${rcloneBin} ${args.join(" ")}`);
+  logInfo(`[workspace-sync] Running: ${rcloneBin} ${args.join(" ")}`);
 
   const attempt = async (
     attemptArgs: string[],
@@ -519,14 +523,14 @@ export async function runBisync(params: {
 
   // Auto-clear stale lock files and retry
   if (!result.ok && (result.error?.includes("lock file found") || result.error?.includes(".lck"))) {
-    logVerbose("Stale lock file detected, clearing and retrying");
+    logInfo("[workspace-sync] Stale lock file detected, clearing and retrying");
     clearBisyncLocks();
     result = await attempt(args);
   }
 
   // Auto-retry with --resync when bisync requires it
   if (!result.ok && !params.resync && (result.error?.includes("--resync") || result.error?.includes("Must run --resync") || result.error?.includes("Bisync aborted"))) {
-    logVerbose("Bisync requires --resync, retrying automatically");
+    logInfo("[workspace-sync] Bisync requires --resync, retrying automatically");
     const resyncArgs = [...args, "--resync"];
     result = await attempt(resyncArgs);
   }
@@ -560,7 +564,7 @@ export async function runSync(params: {
   if (params.verbose) args.push("--verbose");
   else args.push("--log-level", "WARNING");
 
-  logVerbose(`Running: ${rcloneBin} ${args.join(" ")}`);
+  logInfo(`[workspace-sync] Running: ${rcloneBin} ${args.join(" ")}`);
 
   try {
     await runExec(rcloneBin, args, { timeoutMs: 600_000, maxBuffer: 10_000_000 });
