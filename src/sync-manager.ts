@@ -28,8 +28,8 @@ type SyncManagerState = {
   lastSyncOk: boolean | null;
   syncCount: number;
   errorCount: number;
-  hasSuccessfulSync: boolean;
   running: boolean;
+  syncing: boolean;
   intervalMs: number;
 };
 
@@ -39,8 +39,8 @@ const state: SyncManagerState = {
   lastSyncOk: null,
   syncCount: 0,
   errorCount: 0,
-  hasSuccessfulSync: false,
   running: false,
+  syncing: false,
   intervalMs: 0,
 };
 
@@ -63,11 +63,16 @@ async function runSyncLoop(): Promise<void> {
 
 async function doSync(): Promise<void> {
   if (!currentSyncConfig || !currentLogger || !currentWorkspaceDir) return;
+  if (state.syncing) {
+    currentLogger.info("[workspace-sync] Sync already in progress, skipping this cycle");
+    return;
+  }
 
   const syncConfig = currentSyncConfig;
   if (!syncConfig.provider || syncConfig.provider === "off") return;
 
   const logger = currentLogger;
+  state.syncing = true;
 
   try {
     const installed = await isRcloneInstalled();
@@ -97,7 +102,7 @@ async function doSync(): Promise<void> {
       conflictResolve: resolved.conflictResolve,
       exclude: resolved.exclude,
       copySymlinks: resolved.copySymlinks,
-      resync: !state.hasSuccessfulSync,
+      resync: false,
       timeoutMs: resolved.timeoutMs,
       verbose: !!logger.debug,
     });
@@ -107,12 +112,10 @@ async function doSync(): Promise<void> {
 
     if (result.ok) {
       state.lastSyncOk = true;
-      state.hasSuccessfulSync = true;
       logger.info("[workspace-sync] Periodic sync completed");
     } else {
       state.lastSyncOk = false;
       state.errorCount++;
-      state.hasSuccessfulSync = false;
       logger.warn(`[workspace-sync] Periodic sync failed: ${result.error}`);
     }
   } catch (err) {
@@ -121,6 +124,8 @@ async function doSync(): Promise<void> {
     logger.error(
       `[workspace-sync] Periodic sync error: ${err instanceof Error ? err.message : String(err)}`,
     );
+  } finally {
+    state.syncing = false;
   }
 }
 
@@ -172,6 +177,7 @@ export function startSyncManager(
 
 export function stopSyncManager(): void {
   state.running = false;
+  state.syncing = false;
   if (state.timeoutId) {
     clearTimeout(state.timeoutId);
     state.timeoutId = null;

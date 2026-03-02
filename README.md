@@ -287,6 +287,21 @@ Benefits:
 - If token is compromised, blast radius is limited
 - Clean separation — sync folder lives under `Apps/`
 
+## Important: `--resync` is destructive
+
+**Never use `--resync` unless you know exactly what it does.** The `--resync` flag tells rclone to throw away its knowledge of what has changed and do a full reconciliation — it copies every file that exists on either side to the other side. This means:
+
+- Files you deleted remotely will come back from local (and vice versa)
+- It transfers your **entire** sync scope, not just recent changes
+- On a large Dropbox, this can take 30+ minutes and fill your disk
+
+Normal bisync (without `--resync`) only transfers files that changed since the last sync. The plugin **never** auto-resyncs. If bisync's internal state gets corrupted, it will log a message telling you to run `--resync` manually — but only do this after confirming both sides are in the state you want.
+
+```bash
+# Only when you explicitly need to re-establish the baseline:
+openclaw workspace-sync sync --resync
+```
+
 ## Troubleshooting
 
 ### Token expired

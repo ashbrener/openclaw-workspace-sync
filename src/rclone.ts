@@ -606,11 +606,10 @@ export async function runBisync(params: {
     result = await attempt(args);
   }
 
-  // Auto-retry with --resync when bisync requires it
-  if (!result.ok && !params.resync && (result.error?.includes("--resync") || result.error?.includes("Must run --resync") || result.error?.includes("Bisync aborted"))) {
-    logInfo("[workspace-sync] Bisync requires --resync, retrying automatically");
-    const resyncArgs = [...args, "--resync"];
-    result = await attempt(resyncArgs);
+  // Never auto-resync — --resync does a full reconciliation that overwrites
+  // the local side with remote state. Only use when explicitly forced via CLI.
+  if (!result.ok && (result.error?.includes("--resync") || result.error?.includes("Must run --resync") || result.error?.includes("Bisync aborted"))) {
+    logInfo("[workspace-sync] Bisync needs --resync to re-establish baseline. Run manually: openclaw workspace-sync sync --resync");
   }
 
   return result;

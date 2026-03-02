@@ -32,12 +32,12 @@ openclaw workspace-sync sync
 
 Runs a bidirectional sync immediately. Use after bulk workspace changes.
 
-### First-time sync (required once)
+### Force re-establish baseline (destructive)
 ```bash
 openclaw workspace-sync sync --resync
 ```
 
-Required on first run to establish baseline. Only needed once per remote.
+**WARNING: `--resync` is destructive.** It copies ALL files from both sides to make them identical — deleted files come back, and it transfers everything, not just changes. Only use when you explicitly need to re-establish the bisync baseline (e.g., after first install or after wiping one side). The plugin never auto-resyncs.
 
 ### View remote files
 ```bash
@@ -87,7 +87,7 @@ Workspace sync is configured via the plugin entry in `openclaw.json`:
 | `conflictResolve` | `"newer"` | `newer`, `local`, or `remote` |
 | `exclude` | see below | Glob patterns to exclude from sync |
 
-Default excludes: `.git/**`, `node_modules/**`, `.venv/**`, `__pycache__/**`, `*.log`, `.DS_Store`
+Default excludes: `**/.DS_Store` only. Add your own patterns for `.git`, `node_modules`, etc.
 
 ## Automatic sync
 
@@ -100,8 +100,8 @@ When configured, sync runs automatically:
 
 The plugin automatically handles common rclone failures:
 - **Stale lock files**: Detected and cleared before retrying (lock files older than 15 min are expired automatically)
-- **Resync required**: If bisync state is lost, automatically retries with `--resync`
 - **Interrupted syncs**: Uses `--recover` and `--resilient` flags to resume after interruptions
+- **Resync never automatic**: If bisync state is lost, the plugin logs a message but does NOT auto-resync. You must explicitly run `openclaw workspace-sync sync --resync` after confirming both sides are correct.
 
 ## Troubleshooting
 
@@ -112,7 +112,7 @@ openclaw workspace-sync setup
 ```
 
 ### "requires --resync"
-First sync needs to establish baseline:
+Bisync state was lost. **Before running `--resync`, verify both sides are in the state you want** — resync copies everything from both sides to make them identical:
 ```bash
 openclaw workspace-sync sync --resync
 ```
@@ -133,6 +133,6 @@ rclone ls cloud:openclaw-share
 
 - Sync is bidirectional (changes flow both ways)
 - Conflicts resolve by newest file (configurable via `conflictResolve`)
-- `.git/` and `node_modules/` excluded by default
+- Only `**/.DS_Store` excluded by default — add your own excludes in config
 - Sync operations run in background (no LLM tokens used)
 - All rclone activity is logged at info level for visibility
