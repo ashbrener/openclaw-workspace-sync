@@ -5,7 +5,7 @@
  * Uses child_process.execFile directly instead of the core runExec wrapper.
  */
 
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, unlinkSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { homedir, platform } from "node:os";
@@ -52,6 +52,76 @@ function runExec(
         return;
       }
       resolve({ stdout, stderr });
+    });
+  });
+}
+
+/**
+ * Streaming exec — pipes stdout/stderr line-by-line to the plugin logger
+ * so output appears in real time instead of being buffered until exit.
+ */
+function runExecStreaming(
+  command: string,
+  args: string[],
+  opts: { timeoutMs?: number; onLine?: (line: string) => void } = {},
+): Promise<{ stdout: string; stderr: string }> {
+  const { timeoutMs = 1_800_000, onLine } = opts;
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { stdio: ["ignore", "pipe", "pipe"] });
+
+    let stdout = "";
+    let stderr = "";
+    let killed = false;
+
+    const timer = timeoutMs > 0
+      ? setTimeout(() => {
+          killed = true;
+          child.kill("SIGTERM");
+        }, timeoutMs)
+      : undefined;
+
+    child.stdout.on("data", (chunk: Buffer) => {
+      const text = chunk.toString();
+      stdout += text;
+      if (onLine) {
+        for (const line of text.split("\n")) {
+          const trimmed = line.trim();
+          if (trimmed) onLine(trimmed);
+        }
+      }
+    });
+
+    child.stderr.on("data", (chunk: Buffer) => {
+      const text = chunk.toString();
+      stderr += text;
+      if (onLine) {
+        for (const line of text.split("\n")) {
+          const trimmed = line.trim();
+          if (trimmed) onLine(trimmed);
+        }
+      }
+    });
+
+    child.on("close", (code) => {
+      if (timer) clearTimeout(timer);
+      if (killed) {
+        const err = new Error(`Command timed out after ${timeoutMs}ms`) as Error & { stdout?: string; stderr?: string };
+        err.stdout = stdout;
+        err.stderr = stderr;
+        reject(err);
+      } else if (code !== 0) {
+        const err = new Error(`Command failed with exit code ${code}`) as Error & { stdout?: string; stderr?: string };
+        err.stdout = stdout;
+        err.stderr = stderr;
+        reject(err);
+      } else {
+        resolve({ stdout, stderr });
+      }
+    });
+
+    child.on("error", (err) => {
+      if (timer) clearTimeout(timer);
+      reject(err);
     });
   });
 }
@@ -501,9 +571,9 @@ export async function runBisync(params: {
     attemptArgs: string[],
   ): Promise<RcloneSyncResult> => {
     try {
-      const { stdout, stderr } = await runExec(rcloneBin, attemptArgs, {
+      const { stdout, stderr } = await runExecStreaming(rcloneBin, attemptArgs, {
         timeoutMs: params.timeoutMs ?? 1_800_000,
-        maxBuffer: 10_000_000,
+        onLine: (line) => logInfo(`[rclone] ${line}`),
       });
 
       const combined = stdout + stderr;
@@ -575,7 +645,10 @@ export async function runSync(params: {
   logInfo(`[workspace-sync] Running: ${rcloneBin} ${args.join(" ")}`);
 
   try {
-    await runExec(rcloneBin, args, { timeoutMs: params.timeoutMs ?? 1_800_000, maxBuffer: 10_000_000 });
+    await runExecStreaming(rcloneBin, args, {
+      timeoutMs: params.timeoutMs ?? 1_800_000,
+      onLine: (line) => logInfo(`[rclone] ${line}`),
+    });
     return { ok: true };
   } catch (err) {
     const errObj = err as { stderr?: string; message?: string };
