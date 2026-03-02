@@ -214,7 +214,6 @@ export function resolveSyncConfig(
   copySymlinks: boolean;
   interval: number;
   timeoutMs: number;
-  verbose: boolean;
   onSessionStart: boolean;
   onSessionEnd: boolean;
 } {
@@ -230,7 +229,6 @@ export function resolveSyncConfig(
     copySymlinks: config?.copySymlinks ?? false,
     interval: config?.interval ?? 0,
     timeoutMs: (config?.timeout ?? DEFAULT_TIMEOUT_S) * 1000,
-    verbose: config?.verbose ?? false,
     onSessionStart: config?.onSessionStart ?? false,
     onSessionEnd: config?.onSessionEnd ?? false,
   };

@@ -27,10 +27,6 @@
       "help": "Max seconds to wait for a single rclone sync operation (default: 1800 = 30 min)",
       "advanced": true
     },
-    "verbose": {
-      "label": "Verbose Logging",
-      "help": "Log detailed rclone output (useful for debugging sync issues)"
-    },
     "onSessionStart": {
       "label": "Sync on Session Start",
       "help": "Automatically sync when an agent session begins"
@@ -139,9 +135,6 @@
       "timeout": {
         "type": "number",
         "minimum": 60
-      },
-      "verbose": {
-        "type": "boolean"
       },
       "onSessionStart": {
         "type": "boolean"
