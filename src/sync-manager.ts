@@ -99,6 +99,7 @@ async function doSync(): Promise<void> {
       copySymlinks: resolved.copySymlinks,
       resync: !state.hasSuccessfulSync,
       timeoutMs: resolved.timeoutMs,
+      verbose: resolved.verbose,
     });
 
     state.lastSyncAt = new Date();

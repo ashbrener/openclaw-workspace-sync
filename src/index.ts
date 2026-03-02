@@ -118,7 +118,7 @@ const workspaceSyncPlugin = {
                   direction: opts.direction,
                   exclude: resolved.exclude,
                   dryRun: opts.dryRun,
-                  verbose: opts.verbose,
+                  verbose: opts.verbose || resolved.verbose,
                   timeoutMs: resolved.timeoutMs,
                 });
               } else {
@@ -132,7 +132,7 @@ const workspaceSyncPlugin = {
                   copySymlinks: resolved.copySymlinks,
                   resync: opts.resync,
                   dryRun: opts.dryRun,
-                  verbose: opts.verbose,
+                  verbose: opts.verbose || resolved.verbose,
                   timeoutMs: resolved.timeoutMs,
                 });
               }
@@ -573,6 +573,7 @@ const workspaceSyncPlugin = {
             exclude: resolved.exclude,
             copySymlinks: resolved.copySymlinks,
             timeoutMs: resolved.timeoutMs,
+            verbose: resolved.verbose,
           });
 
           if (result.ok) {
@@ -621,6 +622,7 @@ const workspaceSyncPlugin = {
             exclude: resolved.exclude,
             copySymlinks: resolved.copySymlinks,
             timeoutMs: resolved.timeoutMs,
+            verbose: resolved.verbose,
           });
 
           if (result.ok) {

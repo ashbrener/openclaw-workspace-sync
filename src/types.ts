@@ -19,6 +19,8 @@ export type WorkspaceSyncConfig = {
   interval?: number;
   /** Max seconds to wait for a single rclone sync operation (default: 1800 = 30 min). */
   timeout?: number;
+  /** Log rclone output at verbose level (default: false). */
+  verbose?: boolean;
   onSessionStart?: boolean;
   onSessionEnd?: boolean;
   remoteName?: string;
