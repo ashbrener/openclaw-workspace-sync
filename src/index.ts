@@ -119,6 +119,7 @@ const workspaceSyncPlugin = {
                   exclude: resolved.exclude,
                   dryRun: opts.dryRun,
                   verbose: opts.verbose,
+                  timeoutMs: resolved.timeoutMs,
                 });
               } else {
                 result = await runBisync({
@@ -132,6 +133,7 @@ const workspaceSyncPlugin = {
                   resync: opts.resync,
                   dryRun: opts.dryRun,
                   verbose: opts.verbose,
+                  timeoutMs: resolved.timeoutMs,
                 });
               }
 
@@ -570,6 +572,7 @@ const workspaceSyncPlugin = {
             conflictResolve: resolved.conflictResolve,
             exclude: resolved.exclude,
             copySymlinks: resolved.copySymlinks,
+            timeoutMs: resolved.timeoutMs,
           });
 
           if (result.ok) {
@@ -617,6 +620,7 @@ const workspaceSyncPlugin = {
             conflictResolve: resolved.conflictResolve,
             exclude: resolved.exclude,
             copySymlinks: resolved.copySymlinks,
+            timeoutMs: resolved.timeoutMs,
           });
 
           if (result.ok) {

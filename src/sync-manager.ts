@@ -98,6 +98,7 @@ async function doSync(): Promise<void> {
       exclude: resolved.exclude,
       copySymlinks: resolved.copySymlinks,
       resync: !state.hasSuccessfulSync,
+      timeoutMs: resolved.timeoutMs,
     });
 
     state.lastSyncAt = new Date();

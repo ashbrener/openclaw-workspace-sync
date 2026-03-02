@@ -21,6 +21,12 @@
       "placeholder": "0",
       "help": "Background sync interval (0 = manual only). Pure file sync, zero LLM cost."
     },
+    "timeout": {
+      "label": "Sync Timeout (seconds)",
+      "placeholder": "1800",
+      "help": "Max seconds to wait for a single rclone sync operation (default: 1800 = 30 min)",
+      "advanced": true
+    },
     "onSessionStart": {
       "label": "Sync on Session Start",
       "help": "Automatically sync when an agent session begins"
@@ -125,6 +131,10 @@
       "interval": {
         "type": "number",
         "minimum": 0
+      },
+      "timeout": {
+        "type": "number",
+        "minimum": 60
       },
       "onSessionStart": {
         "type": "boolean"

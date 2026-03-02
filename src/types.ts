@@ -17,6 +17,8 @@ export type WorkspaceSyncConfig = {
   remotePath?: string;
   localPath?: string;
   interval?: number;
+  /** Max seconds to wait for a single rclone sync operation (default: 1800 = 30 min). */
+  timeout?: number;
   onSessionStart?: boolean;
   onSessionEnd?: boolean;
   remoteName?: string;

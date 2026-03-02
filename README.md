@@ -66,6 +66,7 @@ Add to your `openclaw.json`:
           "remotePath": "openclaw-share",
           "localPath": "shared",
           "interval": 300,
+          "timeout": 1800,
           "onSessionStart": true,
           "onSessionEnd": false,
           "conflictResolve": "newer",
@@ -85,6 +86,7 @@ Add to your `openclaw.json`:
 | `remotePath` | string | `"openclaw-share"` | Folder name in cloud storage |
 | `localPath` | string | `"shared"` | Subfolder within workspace to sync |
 | `interval` | number | `0` | Background sync interval in seconds (0 = manual only, min 60) |
+| `timeout` | number | `1800` | Max seconds for a single rclone sync operation (min 60) |
 | `onSessionStart` | boolean | `false` | Sync when an agent session begins |
 | `onSessionEnd` | boolean | `false` | Sync when an agent session ends |
 | `remoteName` | string | `"cloud"` | rclone remote name |
@@ -228,11 +230,12 @@ Set `interval` to enable automatic background sync (in seconds):
 
 ```json
 {
-  "interval": 300
+  "interval": 300,
+  "timeout": 3600
 }
 ```
 
-The gateway runs rclone bisync in the background at this interval. Minimum interval is 60 seconds.
+The gateway runs rclone bisync in the background at this interval. Minimum interval is 60 seconds. The `timeout` controls how long each sync operation is allowed to run (default: 1800s / 30 min). Increase this for large workspaces or slow connections.
 
 ### External cron (alternative)
 
@@ -304,6 +307,26 @@ find <workspace>/shared -name "*.conflict"
 
 ```bash
 openclaw workspace-sync sync --resync
+```
+
+### Stale lock files
+
+The plugin automatically handles stale rclone lock files. If a sync is interrupted (timeout, crash, kill), the next run detects the stale lock, clears it, and retries. Lock files older than 15 minutes are treated as expired by rclone's `--max-lock` flag.
+
+If you still see lock errors, you can manually clear them:
+
+```bash
+rclone deletefile ~/.cache/rclone/bisync/<lockfile>.lck
+```
+
+### Sync times out
+
+Increase the `timeout` config (in seconds). The default is 1800 (30 min). For large workspaces:
+
+```json
+{
+  "timeout": 3600
+}
 ```
 
 ### Permission errors

@@ -213,9 +213,11 @@ export function resolveSyncConfig(
   exclude: string[];
   copySymlinks: boolean;
   interval: number;
+  timeoutMs: number;
   onSessionStart: boolean;
   onSessionEnd: boolean;
 } {
+  const DEFAULT_TIMEOUT_S = 1800;
   return {
     provider: config?.provider ?? "off",
     remoteName: config?.remoteName ?? DEFAULT_REMOTE_NAME,
@@ -226,6 +228,7 @@ export function resolveSyncConfig(
     exclude: config?.exclude ?? DEFAULT_EXCLUDES,
     copySymlinks: config?.copySymlinks ?? false,
     interval: config?.interval ?? 0,
+    timeoutMs: (config?.timeout ?? DEFAULT_TIMEOUT_S) * 1000,
     onSessionStart: config?.onSessionStart ?? false,
     onSessionEnd: config?.onSessionEnd ?? false,
   };
@@ -462,6 +465,7 @@ export async function runBisync(params: {
   resync?: boolean;
   dryRun?: boolean;
   verbose?: boolean;
+  timeoutMs?: number;
 }): Promise<RcloneSyncResult> {
   const rcloneBin = await getRcloneBinary();
 
@@ -479,6 +483,9 @@ export async function runBisync(params: {
     params.conflictResolve,
     "--conflict-suffix",
     ".conflict",
+    "--max-lock", "15m",
+    "--recover",
+    "--resilient",
   ];
 
   for (const pattern of params.exclude) args.push("--exclude", pattern);
@@ -495,7 +502,7 @@ export async function runBisync(params: {
   ): Promise<RcloneSyncResult> => {
     try {
       const { stdout, stderr } = await runExec(rcloneBin, attemptArgs, {
-        timeoutMs: 600_000,
+        timeoutMs: params.timeoutMs ?? 1_800_000,
         maxBuffer: 10_000_000,
       });
 
@@ -547,6 +554,7 @@ export async function runSync(params: {
   exclude: string[];
   dryRun?: boolean;
   verbose?: boolean;
+  timeoutMs?: number;
 }): Promise<RcloneSyncResult> {
   const rcloneBin = await getRcloneBinary();
 
@@ -567,7 +575,7 @@ export async function runSync(params: {
   logInfo(`[workspace-sync] Running: ${rcloneBin} ${args.join(" ")}`);
 
   try {
-    await runExec(rcloneBin, args, { timeoutMs: 600_000, maxBuffer: 10_000_000 });
+    await runExec(rcloneBin, args, { timeoutMs: params.timeoutMs ?? 1_800_000, maxBuffer: 10_000_000 });
     return { ok: true };
   } catch (err) {
     const errObj = err as { stderr?: string; message?: string };

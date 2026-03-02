@@ -61,8 +61,11 @@ Workspace sync is configured via the plugin entry in `openclaw.json`:
           "remotePath": "openclaw-share",
           "localPath": "shared",
           "interval": 300,
+          "timeout": 1800,
           "onSessionStart": true,
-          "onSessionEnd": true
+          "onSessionEnd": true,
+          "conflictResolve": "newer",
+          "exclude": [".git/**", "node_modules/**", "*.log"]
         }
       }
     }
@@ -70,12 +73,35 @@ Workspace sync is configured via the plugin entry in `openclaw.json`:
 }
 ```
 
+### Config keys
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `provider` | `"off"` | `dropbox`, `gdrive`, `onedrive`, `s3`, `custom`, or `off` |
+| `remotePath` | `"openclaw-share"` | Folder name in cloud storage |
+| `localPath` | `"shared"` | Subfolder within workspace to sync |
+| `interval` | `0` | Background sync interval in seconds (0 = manual only, min 60) |
+| `timeout` | `1800` | Max seconds for a single sync operation (min 60) |
+| `onSessionStart` | `false` | Sync when an agent session begins |
+| `onSessionEnd` | `false` | Sync when an agent session ends |
+| `conflictResolve` | `"newer"` | `newer`, `local`, or `remote` |
+| `exclude` | see below | Glob patterns to exclude from sync |
+
+Default excludes: `.git/**`, `node_modules/**`, `.venv/**`, `__pycache__/**`, `*.log`, `.DS_Store`
+
 ## Automatic sync
 
 When configured, sync runs automatically:
 - **On session start**: Before you start working (pulls latest from cloud)
 - **On session end**: After conversation ends (pushes changes to cloud)
 - **Periodic interval**: Background sync every N seconds (no LLM cost)
+
+## Auto-recovery
+
+The plugin automatically handles common rclone failures:
+- **Stale lock files**: Detected and cleared before retrying (lock files older than 15 min are expired automatically)
+- **Resync required**: If bisync state is lost, automatically retries with `--resync`
+- **Interrupted syncs**: Uses `--recover` and `--resilient` flags to resume after interruptions
 
 ## Troubleshooting
 
@@ -91,6 +117,12 @@ First sync needs to establish baseline:
 openclaw workspace-sync sync --resync
 ```
 
+### Sync times out
+Increase the `timeout` in your config (default is 1800 seconds / 30 min):
+```json
+{ "timeout": 3600 }
+```
+
 ### Check rclone directly
 ```bash
 rclone lsd cloud:/
@@ -100,6 +132,7 @@ rclone ls cloud:openclaw-share
 ## Notes
 
 - Sync is bidirectional (changes flow both ways)
-- Conflicts resolve by newest file (configurable)
+- Conflicts resolve by newest file (configurable via `conflictResolve`)
 - `.git/` and `node_modules/` excluded by default
 - Sync operations run in background (no LLM tokens used)
+- All rclone activity is logged at info level for visibility
