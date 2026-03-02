@@ -573,7 +573,13 @@ export async function runBisync(params: {
     try {
       const { stdout, stderr } = await runExecStreaming(rcloneBin, attemptArgs, {
         timeoutMs: params.timeoutMs ?? 1_800_000,
-        onLine: (line) => logInfo(`[rclone] ${line}`),
+        onLine: (line) => {
+          if (/ERROR|NOTICE|WARNING|Transferred:|Elapsed time:/i.test(line)) {
+            logInfo(`[rclone] ${line}`);
+          } else {
+            logDebug(`[rclone] ${line}`);
+          }
+        },
       });
 
       const combined = stdout + stderr;
@@ -647,7 +653,13 @@ export async function runSync(params: {
   try {
     await runExecStreaming(rcloneBin, args, {
       timeoutMs: params.timeoutMs ?? 1_800_000,
-      onLine: (line) => logInfo(`[rclone] ${line}`),
+      onLine: (line) => {
+        if (/ERROR|NOTICE|WARNING|Transferred:|Elapsed time:/i.test(line)) {
+          logInfo(`[rclone] ${line}`);
+        } else {
+          logDebug(`[rclone] ${line}`);
+        }
+      },
     });
     return { ok: true };
   } catch (err) {
