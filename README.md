@@ -297,16 +297,10 @@ openclaw workspace-sync authorize
 
 ### Conflicts
 
-Files modified on both sides get `.conflict` suffix:
+Files modified on both sides get a `.conflict` suffix. The winner is determined by `conflictResolve` (default: `newer`). To find conflict files:
 
 ```bash
 find <workspace>/shared -name "*.conflict"
-```
-
-### First sync fails
-
-```bash
-openclaw workspace-sync sync --resync
 ```
 
 ### Stale lock files
