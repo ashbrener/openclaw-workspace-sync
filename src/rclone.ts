@@ -135,12 +135,7 @@ const DEFAULT_LOCAL_PATH = "shared";
 const DEFAULT_REMOTE_PATH = "openclaw-share";
 const DEFAULT_CONFLICT_RESOLVE = "newer";
 const DEFAULT_EXCLUDES = [
-  ".git/**",
-  "node_modules/**",
-  ".venv/**",
-  "__pycache__/**",
-  "*.log",
-  ".DS_Store",
+  "**/.DS_Store",
 ];
 
 export type RcloneSyncResult = {
