@@ -87,7 +87,7 @@ Because the push explicitly excludes `_inbox/**` and `_outbox/**`, there is no r
 The agent workspace is the source of truth. Every sync cycle copies the latest workspace state down to your local folder. Local files outside the workspace are never sent up.
 
 ```mermaid
-flowchart RL
+flowchart LR
     subgraph GW["Gateway (source of truth)"]
         WS["/workspace"]
     end
@@ -95,10 +95,10 @@ flowchart RL
         CF["workspace files"]
     end
     subgraph LOCAL["Your Machine"]
-        LM["local copy"]
+        LM["local copy (read-only)"]
     end
-    WS -- "rclone sync (pull)" --> CF
-    CF -. "desktop app (auto)" .-> LM
+    CF -- "rclone sync (pull)" --> LM
+    WS -. "agent writes here" .-> WS
 ```
 
 This is safe: even if something goes wrong, only your local copy is affected — the workspace stays untouched.
@@ -134,8 +134,10 @@ flowchart LR
     subgraph LOCAL["Your Machine"]
         LM["local copy"]
     end
-    WS <-- "rclone bisync" --> CF
-    CF <-. "desktop app (auto)" .-> LM
+    WS -- "rclone bisync" --> CF
+    CF -- "rclone bisync" --> WS
+    CF -. "desktop app" .-> LM
+    LM -. "desktop app" .-> CF
 ```
 
 Use this only if you understand the trade-offs:
