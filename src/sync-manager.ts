@@ -6,12 +6,18 @@
  */
 
 import type { WorkspaceSyncConfig } from "./types.js";
+import { existsSync, mkdirSync } from "node:fs";
+import { join } from "node:path";
 import {
   isRcloneInstalled,
   isRcloneConfigured,
   ensureRcloneConfigFromConfig,
   resolveSyncConfig,
   runBisync,
+  runSync,
+  runCopy,
+  runMove,
+  runMkdir,
   clearBisyncLocks,
 } from "./rclone.js";
 
@@ -71,6 +77,13 @@ async function doSync(): Promise<void> {
   const syncConfig = currentSyncConfig;
   if (!syncConfig.provider || syncConfig.provider === "off") return;
 
+  if (!syncConfig.mode) {
+    currentLogger.error(
+      '[workspace-sync] "mode" is required in config. Set "mode": "mailbox" (inbox/outbox, safest), "mode": "mirror" (remote→local), or "mode": "bisync" (bidirectional). Sync will not run until mode is set.',
+    );
+    return;
+  }
+
   const logger = currentLogger;
   state.syncing = true;
 
@@ -90,33 +103,160 @@ async function doSync(): Promise<void> {
       return;
     }
 
-    logger.info(
-      `[workspace-sync] Running periodic sync: ${resolved.remoteName}:${resolved.remotePath}`,
-    );
+    const mode = resolved.mode;
 
-    const result = await runBisync({
-      configPath: resolved.configPath,
-      remoteName: resolved.remoteName,
-      remotePath: resolved.remotePath,
-      localPath: resolved.localPath,
-      conflictResolve: resolved.conflictResolve,
-      exclude: resolved.exclude,
-      copySymlinks: resolved.copySymlinks,
-      resync: false,
-      timeoutMs: resolved.timeoutMs,
-      verbose: !!logger.debug,
-    });
+    if (mode === "bisync") {
+      logger.info(
+        `[workspace-sync] Running periodic bisync: ${resolved.remoteName}:${resolved.remotePath}`,
+      );
 
-    state.lastSyncAt = new Date();
-    state.syncCount++;
+      const result = await runBisync({
+        configPath: resolved.configPath,
+        remoteName: resolved.remoteName,
+        remotePath: resolved.remotePath,
+        localPath: resolved.localPath,
+        conflictResolve: resolved.conflictResolve,
+        exclude: resolved.exclude,
+        copySymlinks: resolved.copySymlinks,
+        resync: false,
+        timeoutMs: resolved.timeoutMs,
+        verbose: !!logger.debug,
+      });
 
-    if (result.ok) {
-      state.lastSyncOk = true;
-      logger.info("[workspace-sync] Periodic sync completed");
+      state.lastSyncAt = new Date();
+      state.syncCount++;
+
+      if (result.ok) {
+        state.lastSyncOk = true;
+        logger.info("[workspace-sync] Periodic bisync completed");
+      } else {
+        state.lastSyncOk = false;
+        state.errorCount++;
+        logger.warn(`[workspace-sync] Periodic bisync failed: ${result.error}`);
+      }
+    } else if (mode === "mailbox") {
+      // Mailbox mode: workspace pushes to cloud, then drain cloud _outbox → local _inbox
+      const outboxRemotePath = resolved.remotePath
+        ? `${resolved.remotePath}/_outbox`
+        : "_outbox";
+      const inboxLocalPath = join(resolved.localPath, "_inbox");
+
+      if (!existsSync(inboxLocalPath)) {
+        mkdirSync(inboxLocalPath, { recursive: true });
+      }
+
+      // Step 1: push workspace → cloud (excluding _inbox and _outbox)
+      const mailboxExcludes = [...resolved.exclude, "_inbox/**", "_outbox/**"];
+      logger.info(
+        `[workspace-sync] Mailbox: pushing workspace → ${resolved.remoteName}:${resolved.remotePath}`,
+      );
+
+      const pushResult = await runSync({
+        configPath: resolved.configPath,
+        remoteName: resolved.remoteName,
+        remotePath: resolved.remotePath,
+        localPath: resolved.localPath,
+        direction: "push",
+        exclude: mailboxExcludes,
+        timeoutMs: resolved.timeoutMs,
+        verbose: !!logger.debug,
+      });
+
+      state.lastSyncAt = new Date();
+      state.syncCount++;
+
+      if (pushResult.ok) {
+        state.lastSyncOk = true;
+        logger.info("[workspace-sync] Mailbox push completed");
+      } else {
+        state.lastSyncOk = false;
+        state.errorCount++;
+        logger.warn(`[workspace-sync] Mailbox push failed: ${pushResult.error}`);
+      }
+
+      // Step 2: drain cloud _outbox → local _inbox (move = deletes from cloud after transfer)
+      logger.info(
+        `[workspace-sync] Mailbox: draining ${resolved.remoteName}:${outboxRemotePath} → ${inboxLocalPath}`,
+      );
+
+      const drainResult = await runMove({
+        configPath: resolved.configPath,
+        remoteName: resolved.remoteName,
+        remotePath: outboxRemotePath,
+        localPath: inboxLocalPath,
+        direction: "pull",
+        timeoutMs: resolved.timeoutMs,
+        verbose: !!logger.debug,
+      });
+
+      if (drainResult.ok) {
+        logger.info("[workspace-sync] Mailbox drain completed");
+      } else {
+        logger.warn(`[workspace-sync] Mailbox drain failed: ${drainResult.error}`);
+      }
     } else {
-      state.lastSyncOk = false;
-      state.errorCount++;
-      logger.warn(`[workspace-sync] Periodic sync failed: ${result.error}`);
+      // mirror mode: one-way remote → local
+      logger.info(
+        `[workspace-sync] Running periodic mirror (remote→local): ${resolved.remoteName}:${resolved.remotePath}`,
+      );
+
+      const result = await runSync({
+        configPath: resolved.configPath,
+        remoteName: resolved.remoteName,
+        remotePath: resolved.remotePath,
+        localPath: resolved.localPath,
+        direction: "pull",
+        exclude: resolved.exclude,
+        timeoutMs: resolved.timeoutMs,
+        verbose: !!logger.debug,
+      });
+
+      state.lastSyncAt = new Date();
+      state.syncCount++;
+
+      if (result.ok) {
+        state.lastSyncOk = true;
+        logger.info("[workspace-sync] Periodic mirror completed");
+      } else {
+        state.lastSyncOk = false;
+        state.errorCount++;
+        logger.warn(`[workspace-sync] Periodic mirror failed: ${result.error}`);
+      }
+
+      // ingest: one-way local inbox → remote (additive)
+      if (resolved.ingest) {
+        // inbox lives as a sibling of localPath, not inside it,
+        // so the mirror pull doesn't overwrite or delete inbox contents
+        const { dirname } = await import("node:path");
+        const inboxLocal = join(dirname(resolved.localPath), resolved.ingestPath);
+        if (!existsSync(inboxLocal)) {
+          mkdirSync(inboxLocal, { recursive: true });
+        }
+        const inboxRemotePath = resolved.remotePath
+          ? `${resolved.remotePath}/${resolved.ingestPath}`
+          : resolved.ingestPath;
+
+        logger.info(
+          `[workspace-sync] Running ingest (local inbox→remote): ${inboxLocal} → ${resolved.remoteName}:${inboxRemotePath}`,
+        );
+
+        const ingestResult = await runCopy({
+          configPath: resolved.configPath,
+          remoteName: resolved.remoteName,
+          remotePath: inboxRemotePath,
+          localPath: inboxLocal,
+          direction: "push",
+          exclude: resolved.exclude,
+          timeoutMs: resolved.timeoutMs,
+          verbose: !!logger.debug,
+        });
+
+        if (ingestResult.ok) {
+          logger.info("[workspace-sync] Ingest sync completed");
+        } else {
+          logger.warn(`[workspace-sync] Ingest sync failed: ${ingestResult.error}`);
+        }
+      }
     }
   } catch (err) {
     state.lastSyncOk = false;
@@ -129,6 +269,44 @@ async function doSync(): Promise<void> {
   }
 }
 
+
+/**
+ * Bootstrap mailbox directories:
+ *  - `rclone mkdir cloud:_outbox` so the local Dropbox client creates the folder
+ *  - `mkdir -p <workspace>/_inbox` so the agent has a landing zone
+ */
+async function bootstrapMailbox(
+  syncConfig: WorkspaceSyncConfig,
+  workspaceDir: string,
+  stateDir: string,
+  logger: Logger,
+): Promise<void> {
+  const resolved = resolveSyncConfig(syncConfig, workspaceDir, stateDir);
+
+  ensureRcloneConfigFromConfig(syncConfig, resolved.configPath, resolved.remoteName);
+
+  const outboxRemotePath = resolved.remotePath
+    ? `${resolved.remotePath}/_outbox`
+    : "_outbox";
+
+  const mkdirResult = await runMkdir({
+    configPath: resolved.configPath,
+    remoteName: resolved.remoteName,
+    remotePath: outboxRemotePath,
+  });
+
+  if (mkdirResult.ok) {
+    logger.info(`[workspace-sync] Mailbox: ensured cloud _outbox at ${resolved.remoteName}:${outboxRemotePath}`);
+  } else {
+    logger.warn(`[workspace-sync] Mailbox: failed to create cloud _outbox: ${mkdirResult.error}`);
+  }
+
+  const inboxLocalPath = join(resolved.localPath, "_inbox");
+  if (!existsSync(inboxLocalPath)) {
+    mkdirSync(inboxLocalPath, { recursive: true });
+    logger.info(`[workspace-sync] Mailbox: created local _inbox at ${inboxLocalPath}`);
+  }
+}
 
 export function startSyncManager(
   syncConfig: WorkspaceSyncConfig,
@@ -148,7 +326,19 @@ export function startSyncManager(
     return;
   }
 
+  if (!syncConfig.mode) {
+    logger.error(
+      '[workspace-sync] BREAKING: "mode" is now required. Set "mode": "mailbox" (inbox/outbox, safest), "mode": "mirror" (remote→local), or "mode": "bisync" (bidirectional) in your openclaw.json plugin config. Sync will not start until mode is explicitly set.',
+    );
+    return;
+  }
+
   clearBisyncLocks();
+
+  // Mailbox mode: bootstrap _outbox on cloud and _inbox locally
+  if (syncConfig.mode === "mailbox") {
+    void bootstrapMailbox(syncConfig, workspaceDir, stateDir, logger);
+  }
 
   const intervalSeconds = syncConfig.interval ?? 0;
   if (intervalSeconds <= 0) {
@@ -163,8 +353,9 @@ export function startSyncManager(
     );
   }
 
+  const mode = syncConfig.mode ?? "mirror";
   logger.info(
-    `[workspace-sync] Starting periodic sync every ${effectiveInterval}s (pure file sync, zero LLM cost)`,
+    `[workspace-sync] Starting periodic sync every ${effectiveInterval}s in ${mode} mode (pure file sync, zero LLM cost)`,
   );
 
   state.running = true;

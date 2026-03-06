@@ -10,10 +10,24 @@
 export type WorkspaceSyncProvider = "off" | "dropbox" | "gdrive" | "onedrive" | "s3" | "custom";
 
 /**
+ * Workspace sync modes.
+ * - mirror: one-way remote→local (safe, simple)
+ * - mailbox: inbox/outbox pattern — workspace mirrors down, _outbox sends files up (safest)
+ * - bisync: bidirectional via rclone bisync (advanced, risky on ephemeral platforms)
+ */
+export type WorkspaceSyncMode = "mirror" | "mailbox" | "bisync";
+
+/**
  * Workspace sync configuration — matches the plugin configSchema.
  */
 export type WorkspaceSyncConfig = {
   provider?: WorkspaceSyncProvider;
+  /** Sync mode: "mailbox" (inbox/outbox, safest), "mirror" (remote→local), or "bisync" (bidirectional, advanced). */
+  mode?: WorkspaceSyncMode;
+  /** Enable a local inbox folder that syncs one-way up to the remote workspace (mirror mode only). */
+  ingest?: boolean;
+  /** Local subfolder name for ingestion, relative to localPath. Default: "inbox". Mirror mode only. */
+  ingestPath?: string;
   remotePath?: string;
   localPath?: string;
   interval?: number;

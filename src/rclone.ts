@@ -9,7 +9,7 @@ import { execFile, spawn } from "node:child_process";
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, unlinkSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { homedir, platform } from "node:os";
-import type { WorkspaceSyncConfig, WorkspaceSyncProvider } from "./types.js";
+import type { WorkspaceSyncConfig, WorkspaceSyncMode, WorkspaceSyncProvider } from "./types.js";
 
 type Logger = {
   debug?: (msg: string) => void;
@@ -270,6 +270,9 @@ export function resolveSyncConfig(
   stateDir?: string,
 ): {
   provider: WorkspaceSyncProvider;
+  mode: WorkspaceSyncMode;
+  ingest: boolean;
+  ingestPath: string;
   remoteName: string;
   remotePath: string;
   localPath: string;
@@ -285,6 +288,9 @@ export function resolveSyncConfig(
   const DEFAULT_TIMEOUT_S = 1800;
   return {
     provider: config?.provider ?? "off",
+    mode: config?.mode ?? "mirror",
+    ingest: config?.ingest ?? false,
+    ingestPath: config?.ingestPath ?? "inbox",
     remoteName: config?.remoteName ?? DEFAULT_REMOTE_NAME,
     remotePath: config?.remotePath ?? DEFAULT_REMOTE_PATH,
     localPath: join(workspace, config?.localPath ?? DEFAULT_LOCAL_PATH),
@@ -615,6 +621,59 @@ export async function runBisync(params: {
   return result;
 }
 
+/**
+ * One-way copy (additive only — never deletes on destination).
+ * Used for inbox ingestion so files dropped locally get copied up
+ * to the remote without removing anything that was already there.
+ */
+export async function runCopy(params: {
+  configPath: string;
+  remoteName: string;
+  remotePath: string;
+  localPath: string;
+  direction: "pull" | "push";
+  exclude: string[];
+  dryRun?: boolean;
+  verbose?: boolean;
+  timeoutMs?: number;
+}): Promise<RcloneSyncResult> {
+  const rcloneBin = await getRcloneBinary();
+
+  if (!existsSync(params.localPath)) {
+    mkdirSync(params.localPath, { recursive: true });
+  }
+
+  const remote = `${params.remoteName}:${params.remotePath}`;
+  const [source, dest] =
+    params.direction === "pull" ? [remote, params.localPath] : [params.localPath, remote];
+
+  const args = ["copy", source, dest, "--config", params.configPath];
+  for (const pattern of params.exclude) args.push("--exclude", pattern);
+  if (params.dryRun) args.push("--dry-run");
+  if (params.verbose) args.push("--verbose");
+  else args.push("--log-level", "WARNING");
+
+  logInfo(`[workspace-sync] Running: ${rcloneBin} ${args.join(" ")}`);
+
+  try {
+    await runExecStreaming(rcloneBin, args, {
+      timeoutMs: params.timeoutMs ?? 1_800_000,
+      onLine: (line) => {
+        if (/ERROR|NOTICE|WARNING|Transferred:|Elapsed time:/i.test(line)) {
+          logInfo(`[rclone] ${line}`);
+        } else {
+          logDebug(`[rclone] ${line}`);
+        }
+      },
+    });
+    return { ok: true };
+  } catch (err) {
+    const errObj = err as { stderr?: string; message?: string };
+    const message = errObj.stderr?.trim() || errObj.message || "Unknown copy error";
+    return { ok: false, error: message };
+  }
+}
+
 export async function runSync(params: {
   configPath: string;
   remoteName: string;
@@ -659,6 +718,87 @@ export async function runSync(params: {
   } catch (err) {
     const errObj = err as { stderr?: string; message?: string };
     const message = errObj.stderr?.trim() || errObj.message || "Unknown sync error";
+    return { ok: false, error: message };
+  }
+}
+
+/**
+ * Move files from source to destination, deleting from source after transfer.
+ * Used in mailbox mode to drain the cloud _outbox into the local _inbox.
+ */
+export async function runMove(params: {
+  configPath: string;
+  remoteName: string;
+  remotePath: string;
+  localPath: string;
+  direction: "pull" | "push";
+  exclude?: string[];
+  dryRun?: boolean;
+  verbose?: boolean;
+  timeoutMs?: number;
+}): Promise<RcloneSyncResult> {
+  const rcloneBin = await getRcloneBinary();
+
+  if (!existsSync(params.localPath)) {
+    mkdirSync(params.localPath, { recursive: true });
+  }
+
+  const remote = `${params.remoteName}:${params.remotePath}`;
+  const [source, dest] =
+    params.direction === "pull" ? [remote, params.localPath] : [params.localPath, remote];
+
+  const args = ["move", source, dest, "--config", params.configPath];
+  if (params.exclude) {
+    for (const pattern of params.exclude) args.push("--exclude", pattern);
+  }
+  if (params.dryRun) args.push("--dry-run");
+  if (params.verbose) args.push("--verbose");
+  else args.push("--log-level", "WARNING");
+
+  logInfo(`[workspace-sync] Running: ${rcloneBin} ${args.join(" ")}`);
+
+  try {
+    await runExecStreaming(rcloneBin, args, {
+      timeoutMs: params.timeoutMs ?? 1_800_000,
+      onLine: (line) => {
+        if (/ERROR|NOTICE|WARNING|Transferred:|Elapsed time:/i.test(line)) {
+          logInfo(`[rclone] ${line}`);
+        } else {
+          logDebug(`[rclone] ${line}`);
+        }
+      },
+    });
+    return { ok: true };
+  } catch (err) {
+    const errObj = err as { stderr?: string; message?: string };
+    const message = errObj.stderr?.trim() || errObj.message || "Unknown move error";
+    return { ok: false, error: message };
+  }
+}
+
+/**
+ * Ensure a directory exists on a remote (rclone mkdir).
+ * Used in mailbox mode to bootstrap _outbox on the cloud.
+ */
+export async function runMkdir(params: {
+  configPath: string;
+  remoteName: string;
+  remotePath: string;
+  timeoutMs?: number;
+}): Promise<RcloneSyncResult> {
+  const rcloneBin = await getRcloneBinary();
+
+  const remote = `${params.remoteName}:${params.remotePath}`;
+  const args = ["mkdir", remote, "--config", params.configPath];
+
+  logInfo(`[workspace-sync] Running: ${rcloneBin} ${args.join(" ")}`);
+
+  try {
+    await runExec(rcloneBin, args, { timeoutMs: params.timeoutMs ?? 30_000 });
+    return { ok: true };
+  } catch (err) {
+    const errObj = err as { stderr?: string; message?: string };
+    const message = errObj.stderr?.trim() || errObj.message || "Unknown mkdir error";
     return { ok: false, error: message };
   }
 }
