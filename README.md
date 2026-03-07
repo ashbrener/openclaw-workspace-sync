@@ -263,6 +263,8 @@ Default excludes: `**/.DS_Store`
 }
 ```
 
+With `appFolder: true`, set `remotePath` to `""`. The app folder root is your sync root — do not repeat the app folder name in `remotePath` or rclone will fail with "directory not found."
+
 **Google Drive:**
 
 ```json
@@ -431,15 +433,19 @@ For better security, create a scoped Dropbox app that only accesses a single fol
 1. Go to [Dropbox App Console](https://www.dropbox.com/developers/apps)
 2. Click **Create app** > **Scoped access** > **App folder**
 3. Name it (e.g., `openclaw-sync`)
-4. In **Permissions** tab, enable:
+4. In **Settings** tab, add a **Redirect URI**: `http://localhost:53682/`
+   - This is required for rclone's OAuth flow to work. Without it, Dropbox returns "Invalid redirect_uri" during authorization.
+5. In **Permissions** tab, enable:
    - `files.metadata.read` / `files.metadata.write`
    - `files.content.read` / `files.content.write`
-5. Copy **App key** and **App secret** from Settings
+6. Copy **App key** and **App secret** from Settings
+
+> **Important:** When using an app folder scoped app, set `"remotePath": ""` (empty string) in your config. The app folder **is** the root — rclone sees it as `/`. If you set `remotePath` to your app folder name (e.g., `"openclaw-sync"`), rclone will look for a subfolder *inside* the app folder with that name and fail with "directory not found."
 
 Benefits:
 - Token only accesses one folder, not your entire Dropbox
 - If token is compromised, blast radius is limited
-- Clean separation — sync folder lives under `Apps/`
+- Clean separation — sync folder lives under `Apps/<your-app-name>/`
 
 ## Understanding sync safety
 
