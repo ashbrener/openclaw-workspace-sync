@@ -44,7 +44,7 @@ The agent workspace is the source of truth. Each sync cycle:
 **Step 1 — Push workspace to cloud:**
 
 ```mermaid
-flowchart LR
+flowchart TB
     WS["🟢 /workspace"] -- "rclone sync" --> CF["☁️ cloud files"] -. "desktop app" .-> LM["💻 local mirror"]
 
     classDef gateway fill:#d4edda,stroke:#28a745,stroke-width:2px,color:#155724
@@ -58,8 +58,8 @@ flowchart LR
 **Step 2 — Drain outbox to inbox:**
 
 ```mermaid
-flowchart RL
-    INBOX["🟢 _inbox/"] <-- "rclone move" --- OUTBOX_C["☁️ _outbox/"] <-. "desktop app" .- OUTBOX_L["📤 drop files here"]
+flowchart LR
+    OUTBOX_L["📤 drop files here"] -. "desktop app" .-> OUTBOX_C["☁️ _outbox/"] -- "rclone move" --> INBOX["🟢 _inbox/"]
 
     classDef gateway fill:#d4edda,stroke:#28a745,stroke-width:2px,color:#155724
     classDef exchange fill:#fff3cd,stroke:#f0ad4e,stroke-width:2px,color:#856404
