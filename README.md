@@ -41,7 +41,7 @@ The agent workspace is the source of truth. Each sync cycle:
 1. **Push**: `rclone sync` pushes the workspace to the cloud (excluding `_inbox/` and `_outbox/`)
 2. **Drain**: `rclone move` pulls files from the cloud `_outbox/` into the workspace `_inbox/`, deleting them from the cloud after transfer
 
-**Step 1 — Push workspace to cloud:**
+**Workspace → You:**
 
 ```mermaid
 flowchart TB
@@ -55,7 +55,7 @@ flowchart TB
     class LM local
 ```
 
-**Step 2 — Drain outbox to inbox:**
+**You → Agent:**
 
 ```mermaid
 flowchart LR
