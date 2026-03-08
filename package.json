@@ -25,6 +25,7 @@
   ],
   "files": [
     "dist",
+    "docs",
     "skills",
     "openclaw.plugin.json",
     "README.md",
@@ -34,6 +35,7 @@
     "@clack/prompts": "^1.0.1"
   },
   "devDependencies": {
+    "@mermaid-js/mermaid-cli": "^11.12.0",
     "@types/node": "^22.19.11",
     "typescript": "5.7",
     "vitest": "^3.2.4"
@@ -45,7 +47,8 @@
   },
   "scripts": {
     "build": "tsc",
-    "prepublishOnly": "npm run build",
+    "prepublishOnly": "node scripts/render-mermaid.js && npm run build",
+    "postpublish": "git checkout README.md",
     "test": "vitest run",
     "test:watch": "vitest"
   }
