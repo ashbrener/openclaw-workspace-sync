@@ -43,25 +43,25 @@ The agent workspace is the source of truth. Each sync cycle:
 
 ```mermaid
 flowchart TB
-    subgraph GW["🟢 Gateway (source of truth)"]
-        WS["/workspace"]
-        INBOX["_inbox/"]
+    subgraph LOCAL["💻 Your Machine"]
+        LM["local mirror\n(read-only)"]
+        OUTBOX_L["📤 _outbox/\n(drop files to send)"]
     end
 
     subgraph CLOUD["☁️ Cloud Provider"]
-        CF["workspace files"]
-        OUTBOX_C["_outbox/"]
+        CF["workspace copy"]
+        OUTBOX_C["_outbox/ staging"]
     end
 
-    subgraph LOCAL["💻 Your Machine"]
-        LM["local mirror"]
-        OUTBOX_L["_outbox/ — drop files here"]
+    subgraph GW["🟢 Agent Workspace (source of truth)"]
+        WS["/workspace"]
+        INBOX["📥 _inbox/\n(files land here)"]
     end
 
-    WS -- "rclone sync (push)" --> CF
-    CF -. "desktop app" .-> LM
-    OUTBOX_L -. "desktop app" .-> OUTBOX_C
-    OUTBOX_C -- "rclone move (drain)" --> INBOX
+    WS -- "sync up" --> CF
+    CF -. "auto-mirrors down" .-> LM
+    OUTBOX_L -. "auto-syncs up" .-> OUTBOX_C
+    OUTBOX_C -- "delivered to agent" --> INBOX
 
     classDef gateway fill:#d4edda,stroke:#28a745,stroke-width:2px,color:#155724
     classDef cloud fill:#d6eaf8,stroke:#2980b9,stroke-width:2px,color:#1a5276
