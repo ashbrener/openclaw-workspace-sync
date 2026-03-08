@@ -58,7 +58,7 @@ flowchart TB
 **You → Agent:**
 
 ```mermaid
-flowchart LR
+flowchart TB
     OUTBOX_L["📤 drop files here"] -. "desktop app" .-> OUTBOX_C["☁️ _outbox/"] -- "rclone move" --> INBOX["🟢 _inbox/"]
 
     classDef gateway fill:#d4edda,stroke:#28a745,stroke-width:2px,color:#155724
