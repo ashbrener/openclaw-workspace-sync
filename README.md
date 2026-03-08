@@ -42,23 +42,33 @@ The agent workspace is the source of truth. Each sync cycle:
 2. **Drain**: `rclone move` pulls files from the cloud `_outbox/` into the workspace `_inbox/`, deleting them from the cloud after transfer
 
 ```mermaid
-flowchart LR
-    subgraph GW["Gateway (source of truth)"]
+flowchart TB
+    subgraph GW["🟢 Gateway (source of truth)"]
         WS["/workspace"]
-        INBOX["_inbox/"]
+        INBOX["📥 _inbox/"]
     end
-    subgraph CLOUD["Cloud Provider"]
+    subgraph CLOUD["☁️ Cloud Provider"]
         CF["workspace files"]
         OUTBOX_C["_outbox/"]
     end
-    subgraph LOCAL["Your Machine"]
+    subgraph LOCAL["💻 Your Machine"]
         LM["local mirror"]
-        OUTBOX_L["_outbox/ (drop files here)"]
+        OUTBOX_L["📤 _outbox/ (drop files here)"]
     end
     WS -- "1. rclone sync (push)" --> CF
     CF -. "desktop app (auto)" .-> LM
     OUTBOX_L -. "desktop app (auto)" .-> OUTBOX_C
     OUTBOX_C -- "2. rclone move (drain)" --> INBOX
+
+    classDef gateway fill:#d4edda,stroke:#28a745,stroke-width:2px,color:#155724
+    classDef cloud fill:#d6eaf8,stroke:#2980b9,stroke-width:2px,color:#1a5276
+    classDef local fill:#f5f5f5,stroke:#6c757d,stroke-width:1px,color:#333
+    classDef exchange fill:#fff3cd,stroke:#f0ad4e,stroke-width:2px,color:#856404
+
+    class WS gateway
+    class CF cloud
+    class LM local
+    class INBOX,OUTBOX_L,OUTBOX_C exchange
 ```
 
 This creates a clean separation:
@@ -87,18 +97,26 @@ Because the push explicitly excludes `_inbox/**` and `_outbox/**`, there is no r
 The agent workspace is the source of truth. Every sync cycle copies the latest workspace state down to your local folder. Local files outside the workspace are never sent up.
 
 ```mermaid
-flowchart LR
-    subgraph GW["Gateway (source of truth)"]
+flowchart TB
+    subgraph GW["🟢 Gateway (source of truth)"]
         WS["/workspace"]
     end
-    subgraph CLOUD["Cloud Provider"]
+    subgraph CLOUD["☁️ Cloud Provider"]
         CF["workspace files"]
     end
-    subgraph LOCAL["Your Machine"]
+    subgraph LOCAL["💻 Your Machine"]
         LM["local copy (read-only)"]
     end
+    WS -- "rclone sync (push)" --> CF
     CF -- "rclone sync (pull)" --> LM
-    WS -. "agent writes here" .-> WS
+
+    classDef gateway fill:#d4edda,stroke:#28a745,stroke-width:2px,color:#155724
+    classDef cloud fill:#d6eaf8,stroke:#2980b9,stroke-width:2px,color:#1a5276
+    classDef local fill:#f5f5f5,stroke:#6c757d,stroke-width:1px,color:#333
+
+    class WS gateway
+    class CF cloud
+    class LM local
 ```
 
 This is safe: even if something goes wrong, only your local copy is affected — the workspace stays untouched.
@@ -124,20 +142,28 @@ When enabled, a local `inbox/` folder syncs its contents to `<remotePath>/inbox/
 Full bidirectional sync using rclone bisync. Changes on either side propagate to the other.
 
 ```mermaid
-flowchart LR
-    subgraph GW["Gateway"]
+flowchart TB
+    subgraph GW["⚠️ Gateway"]
         WS["/workspace"]
     end
-    subgraph CLOUD["Cloud Provider"]
+    subgraph CLOUD["☁️ Cloud Provider"]
         CF["workspace files"]
     end
-    subgraph LOCAL["Your Machine"]
+    subgraph LOCAL["💻 Your Machine"]
         LM["local copy"]
     end
     WS -- "rclone bisync" --> CF
     CF -- "rclone bisync" --> WS
     CF -. "desktop app" .-> LM
     LM -. "desktop app" .-> CF
+
+    classDef gateway fill:#fff3cd,stroke:#f0ad4e,stroke-width:2px,color:#856404
+    classDef cloud fill:#d6eaf8,stroke:#2980b9,stroke-width:2px,color:#1a5276
+    classDef local fill:#f5f5f5,stroke:#6c757d,stroke-width:1px,color:#333
+
+    class WS gateway
+    class CF cloud
+    class LM local
 ```
 
 Use this only if you understand the trade-offs:
