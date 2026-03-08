@@ -50,7 +50,8 @@ for (const match of readme.matchAll(mermaidBlock)) {
   // Clean up temp file
   try { execFileSync("rm", [tmpInput]); } catch {}
 
-  const imgTag = `<p align="center">\n  <img src="./docs/diagrams/${svgName}" alt="sync mode diagram" width="700" />\n</p>`;
+  const rawUrl = `https://raw.githubusercontent.com/ashbrener/openclaw-workspace-sync/main/docs/diagrams/${svgName}`;
+  const imgTag = `<p align="center">\n  <img src="${rawUrl}" alt="sync mode diagram" width="700" />\n</p>`;
   replaced = replaced.replace(match[0], imgTag);
   index++;
 }
