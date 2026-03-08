@@ -1,0 +1,41 @@
+.edgeLabel {
+  color: #333333 !important;
+  background-color: #ffffff !important;
+}
+.edgeLabel span {
+  color: #333333 !important;
+  fill: #333333 !important;
+}
+.edgeLabel p {
+  color: #333333 !important;
+}
+.labelBkg {
+  background-color: #ffffff !important;
+}
+
+/* Gateway subgraph — green tint */
+#GW rect {
+  fill: #E8F5E9 !important;
+  stroke: #66BB6A !important;
+}
+#GW .cluster-label span {
+  color: #2E7D32 !important;
+}
+
+/* Cloud subgraph — amber tint */
+#CLOUD rect {
+  fill: #FFF8E1 !important;
+  stroke: #FFB74D !important;
+}
+#CLOUD .cluster-label span {
+  color: #E65100 !important;
+}
+
+/* Local subgraph — blue tint */
+#LOCAL rect {
+  fill: #E3F2FD !important;
+  stroke: #64B5F6 !important;
+}
+#LOCAL .cluster-label span {
+  color: #1565C0 !important;
+}

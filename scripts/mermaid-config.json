@@ -7,25 +7,26 @@
     "secondaryColor": "#F5A623",
     "secondaryTextColor": "#ffffff",
     "secondaryBorderColor": "#D4891A",
-    "tertiaryColor": "#7ED321",
+    "tertiaryColor": "#50C878",
     "tertiaryTextColor": "#ffffff",
-    "tertiaryBorderColor": "#5CA318",
+    "tertiaryBorderColor": "#3BA35C",
     "lineColor": "#5C6B77",
     "textColor": "#333333",
     "mainBkg": "#4A90D9",
     "nodeBorder": "#2E6EB5",
-    "clusterBkg": "#EBF3FB",
-    "clusterBorder": "#B8D4F0",
+    "clusterBkg": "#F0F4F8",
+    "clusterBorder": "#94B8D9",
     "titleColor": "#333333",
     "edgeLabelBackground": "#ffffff",
-    "fontSize": "14px"
+    "fontSize": "14px",
+    "labelTextColor": "#333333"
   },
   "flowchart": {
     "htmlLabels": true,
     "curve": "basis",
-    "padding": 15,
-    "nodeSpacing": 50,
-    "rankSpacing": 60,
+    "padding": 20,
+    "nodeSpacing": 60,
+    "rankSpacing": 70,
     "useMaxWidth": false
   }
 }

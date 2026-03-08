@@ -20,6 +20,7 @@ const srcPath = join(root, "README.src.md");
 const outPath = join(root, "README.md");
 const diagramDir = join(root, "docs", "diagrams");
 const configFile = join(root, "scripts", "mermaid-config.json");
+const cssFile = join(root, "scripts", "mermaid-style.css");
 
 if (!existsSync(srcPath)) {
   console.error("README.src.md not found");
@@ -47,7 +48,7 @@ for (const match of readme.matchAll(mermaidBlock)) {
   try {
     execFileSync(
       join(root, "node_modules", ".bin", "mmdc"),
-      ["-i", tmpInput, "-o", svgPath, "-b", "white", "-c", configFile],
+      ["-i", tmpInput, "-o", svgPath, "-b", "white", "-c", configFile, "-C", cssFile],
       { timeout: 30_000, stdio: "pipe" },
     );
   } catch (err) {
