@@ -1,6 +1,6 @@
 {
   "name": "openclaw-workspace-sync",
-  "version": "2.1.2",
+  "version": "2.1.3",
   "description": "Workspace cloud sync via rclone — mailbox (inbox/outbox), mirror, or bisync (Dropbox, Google Drive, S3, OneDrive, 70+ providers)",
   "type": "module",
   "main": "dist/index.js",
@@ -47,8 +47,8 @@
   },
   "scripts": {
     "build": "tsc",
-    "prepublishOnly": "node scripts/render-mermaid.js && npm run build",
-    "postpublish": "git checkout README.md",
+    "prepublishOnly": "npm run build",
+    "render-readme": "node scripts/render-mermaid.js",
     "test": "vitest run",
     "test:watch": "vitest"
   }

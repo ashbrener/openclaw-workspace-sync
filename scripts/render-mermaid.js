@@ -1,32 +1,39 @@
 #!/usr/bin/env node
 /**
- * Pre-publish script: renders Mermaid code blocks in README.md to SVG images,
- * then replaces the ```mermaid blocks with <img> tags so npm renders them.
+ * Renders Mermaid code blocks in README.src.md to SVG images,
+ * then writes README.md with the mermaid blocks replaced by <img> tags.
  *
- * GitHub renders Mermaid natively, so the original README.md (in git) keeps
- * the code blocks. This script only mutates README.md at publish time;
- * `git checkout README.md` restores the original after publish.
+ * Source of truth: README.src.md (what you edit, has mermaid blocks)
+ * Output: README.md (generated, has <img> tags pointing to committed SVGs)
+ *
+ * Run manually or let the GitHub Action handle it on push.
  */
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, existsSync, unlinkSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, "..");
-const readmePath = join(root, "README.md");
+const srcPath = join(root, "README.src.md");
+const outPath = join(root, "README.md");
 const diagramDir = join(root, "docs", "diagrams");
+
+if (!existsSync(srcPath)) {
+  console.error("README.src.md not found");
+  process.exit(1);
+}
 
 if (!existsSync(diagramDir)) {
   mkdirSync(diagramDir, { recursive: true });
 }
 
-const readme = readFileSync(readmePath, "utf-8");
+const readme = readFileSync(srcPath, "utf-8");
 const mermaidBlock = /```mermaid\n([\s\S]*?)```/g;
 
 let index = 0;
-let replaced = readme;
+let output = readme;
 
 for (const match of readme.matchAll(mermaidBlock)) {
   const mermaidSource = match[1];
@@ -47,19 +54,17 @@ for (const match of readme.matchAll(mermaidBlock)) {
     process.exit(1);
   }
 
-  // Clean up temp file
-  try { execFileSync("rm", [tmpInput]); } catch {}
+  try { unlinkSync(tmpInput); } catch {}
 
   const rawUrl = `https://raw.githubusercontent.com/ashbrener/openclaw-workspace-sync/main/docs/diagrams/${svgName}`;
   const imgTag = `<p align="center">\n  <img src="${rawUrl}" alt="sync mode diagram" width="700" />\n</p>`;
-  replaced = replaced.replace(match[0], imgTag);
+  output = output.replace(match[0], imgTag);
   index++;
 }
 
 if (index === 0) {
-  console.log("No mermaid blocks found in README.md");
-  process.exit(0);
+  console.log("No mermaid blocks found in README.src.md — copying as-is");
 }
 
-writeFileSync(readmePath, replaced);
-console.log(`Rendered ${index} mermaid diagram(s) to docs/diagrams/`);
+writeFileSync(outPath, output);
+console.log(`Rendered ${index} diagram(s) → README.md`);

@@ -41,9 +41,25 @@ The agent workspace is the source of truth. Each sync cycle:
 1. **Push**: `rclone sync` pushes the workspace to the cloud (excluding `_inbox/` and `_outbox/`)
 2. **Drain**: `rclone move` pulls files from the cloud `_outbox/` into the workspace `_inbox/`, deleting them from the cloud after transfer
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/ashbrener/openclaw-workspace-sync/main/docs/diagrams/mode-0.svg" alt="sync mode diagram" width="700" />
-</p>
+```mermaid
+flowchart LR
+    subgraph GW["Gateway (source of truth)"]
+        WS["/workspace"]
+        INBOX["_inbox/"]
+    end
+    subgraph CLOUD["Cloud Provider"]
+        CF["workspace files"]
+        OUTBOX_C["_outbox/"]
+    end
+    subgraph LOCAL["Your Machine"]
+        LM["local mirror"]
+        OUTBOX_L["_outbox/ (drop files here)"]
+    end
+    WS -- "1. rclone sync (push)" --> CF
+    CF -. "desktop app (auto)" .-> LM
+    OUTBOX_L -. "desktop app (auto)" .-> OUTBOX_C
+    OUTBOX_C -- "2. rclone move (drain)" --> INBOX
+```
 
 This creates a clean separation:
 
@@ -70,9 +86,20 @@ Because the push explicitly excludes `_inbox/**` and `_outbox/**`, there is no r
 
 The agent workspace is the source of truth. Every sync cycle copies the latest workspace state down to your local folder. Local files outside the workspace are never sent up.
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/ashbrener/openclaw-workspace-sync/main/docs/diagrams/mode-1.svg" alt="sync mode diagram" width="700" />
-</p>
+```mermaid
+flowchart LR
+    subgraph GW["Gateway (source of truth)"]
+        WS["/workspace"]
+    end
+    subgraph CLOUD["Cloud Provider"]
+        CF["workspace files"]
+    end
+    subgraph LOCAL["Your Machine"]
+        LM["local copy (read-only)"]
+    end
+    CF -- "rclone sync (pull)" --> LM
+    WS -. "agent writes here" .-> WS
+```
 
 This is safe: even if something goes wrong, only your local copy is affected — the workspace stays untouched.
 
@@ -96,9 +123,22 @@ When enabled, a local `inbox/` folder syncs its contents to `<remotePath>/inbox/
 
 Full bidirectional sync using rclone bisync. Changes on either side propagate to the other.
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/ashbrener/openclaw-workspace-sync/main/docs/diagrams/mode-2.svg" alt="sync mode diagram" width="700" />
-</p>
+```mermaid
+flowchart LR
+    subgraph GW["Gateway"]
+        WS["/workspace"]
+    end
+    subgraph CLOUD["Cloud Provider"]
+        CF["workspace files"]
+    end
+    subgraph LOCAL["Your Machine"]
+        LM["local copy"]
+    end
+    WS -- "rclone bisync" --> CF
+    CF -- "rclone bisync" --> WS
+    CF -. "desktop app" .-> LM
+    LM -. "desktop app" .-> CF
+```
 
 Use this only if you understand the trade-offs:
 
