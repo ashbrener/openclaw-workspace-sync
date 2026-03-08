@@ -88,17 +88,18 @@ The agent workspace is the source of truth. Every sync cycle copies the latest w
 
 ```mermaid
 flowchart LR
-    subgraph GW["Gateway (source of truth)"]
-        WS["/workspace"]
-    end
     subgraph CLOUD["Cloud Provider"]
         CF["workspace files"]
     end
     subgraph LOCAL["Your Machine"]
         LM["local copy (read-only)"]
     end
-    WS -- "rclone sync (pull)" --> CF
-    CF -. "desktop app (auto)" .-> LM
+    subgraph GW["Gateway (source of truth)"]
+        WS["/workspace"]
+        NOTE["agent writes here"]
+    end
+    CF -- "rclone sync (pull)" --> LM
+    WS -. "rclone sync (push)" .-> CF
 ```
 
 This is safe: even if something goes wrong, only your local copy is affected — the workspace stays untouched.
