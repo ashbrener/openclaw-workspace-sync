@@ -41,31 +41,36 @@ The agent workspace is the source of truth. Each sync cycle:
 1. **Push**: `rclone sync` pushes the workspace to the cloud (excluding `_inbox/` and `_outbox/`)
 2. **Drain**: `rclone move` pulls files from the cloud `_outbox/` into the workspace `_inbox/`, deleting them from the cloud after transfer
 
-**Workspace → You:**
-
 ```mermaid
 flowchart TB
-    WS["🟢 /workspace"] -- "rclone sync" --> CF["☁️ cloud files"] -. "desktop app" .-> LM["💻 local mirror"]
+    subgraph GW["🟢 Gateway (source of truth)"]
+        WS["/workspace"]
+        INBOX["_inbox/"]
+    end
+
+    subgraph CLOUD["☁️ Cloud Provider"]
+        CF["workspace files"]
+        OUTBOX_C["_outbox/"]
+    end
+
+    subgraph LOCAL["💻 Your Machine"]
+        LM["local mirror"]
+        OUTBOX_L["_outbox/ — drop files here"]
+    end
+
+    WS -- "rclone sync (push)" --> CF
+    CF -. "desktop app" .-> LM
+    OUTBOX_L -. "desktop app" .-> OUTBOX_C
+    OUTBOX_C -- "rclone move (drain)" --> INBOX
 
     classDef gateway fill:#d4edda,stroke:#28a745,stroke-width:2px,color:#155724
     classDef cloud fill:#d6eaf8,stroke:#2980b9,stroke-width:2px,color:#1a5276
     classDef local fill:#f5f5f5,stroke:#6c757d,stroke-width:1px,color:#333
-    class WS gateway
-    class CF cloud
-    class LM local
-```
-
-**You → Agent:**
-
-```mermaid
-flowchart TB
-    OUTBOX_L["📤 drop files here"] -. "desktop app" .-> OUTBOX_C["☁️ _outbox/"] -- "rclone move" --> INBOX["🟢 _inbox/"]
-
-    classDef gateway fill:#d4edda,stroke:#28a745,stroke-width:2px,color:#155724
     classDef exchange fill:#fff3cd,stroke:#f0ad4e,stroke-width:2px,color:#856404
-    classDef cloud fill:#d6eaf8,stroke:#2980b9,stroke-width:2px,color:#1a5276
-    class INBOX gateway
-    class OUTBOX_C cloud
+
+    class WS,INBOX gateway
+    class CF,OUTBOX_C cloud
+    class LM local
     class OUTBOX_L exchange
 ```
 
