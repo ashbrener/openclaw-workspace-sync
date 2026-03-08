@@ -97,8 +97,8 @@ flowchart LR
     subgraph LOCAL["Your Machine"]
         LM["local copy (read-only)"]
     end
-    CF -- "rclone sync (pull)" --> LM
-    WS -. "agent writes here" .-> WS
+    WS -- "rclone sync (pull)" --> CF
+    CF -. "desktop app (auto)" .-> LM
 ```
 
 This is safe: even if something goes wrong, only your local copy is affected — the workspace stays untouched.
