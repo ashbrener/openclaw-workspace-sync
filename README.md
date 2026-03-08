@@ -42,7 +42,7 @@ The agent workspace is the source of truth. Each sync cycle:
 2. **Drain**: `rclone move` pulls files from the cloud `_outbox/` into the workspace `_inbox/`, deleting them from the cloud after transfer
 
 ```mermaid
-flowchart TB
+flowchart LR
     subgraph GW["🟢 Gateway (source of truth)"]
         WS["/workspace"]
         INBOX["📥 _inbox/"]
