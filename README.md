@@ -110,6 +110,28 @@ Use this only if you understand the trade-offs:
 
 If you are running on a container platform, `mailbox` mode is strongly recommended.
 
+## Before your first sync
+
+Getting the initial state right prevents data loss. What you need to do depends on your sync mode:
+
+| Mode | First-sync direction | Starting requirement |
+|------|---------------------|---------------------|
+| `mailbox` | Local → cloud (push) | Local must match remote, or be the source of truth. If local is empty/stale, the push will delete files on cloud. |
+| `mirror` | Cloud → local (pull) | Safe from any state. Local can be empty — the pull downloads everything. |
+| `bisync` | Both directions | Both sides must be aligned. A `--resync` copies everything from both sides — stale files on either side will propagate. |
+
+**Recommended first-time steps for `mailbox` and `bisync`:**
+
+1. Start with an empty local workspace folder, **or**
+2. Manually pull from cloud first to align local with remote:
+   ```bash
+   rclone sync <remote>:<path> /local/workspace/ --config <config-path> --verbose
+   ```
+3. Verify local matches remote before enabling the plugin
+4. Run a `--dry-run` to confirm no unexpected deletions
+
+For `mirror` mode, no preparation is needed — the first sync simply downloads the workspace.
+
 ## Setup sequence
 
 Getting sync right depends on doing things in the right order. Follow these steps:
