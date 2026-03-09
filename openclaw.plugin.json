@@ -5,6 +5,20 @@
       "label": "Cloud Provider",
       "help": "Cloud storage provider for workspace sync"
     },
+    "mode": {
+      "label": "Sync Mode",
+      "help": "mailbox (safest, inbox/outbox), mirror (remote→local), or bisync (bidirectional)"
+    },
+    "ingest": {
+      "label": "Enable Ingest",
+      "help": "Create a local inbox folder that syncs one-way up to the workspace (mirror mode only)"
+    },
+    "ingestPath": {
+      "label": "Ingest Path",
+      "placeholder": "inbox",
+      "help": "Local subfolder name for ingestion (default: inbox). Mirror mode only.",
+      "advanced": true
+    },
     "remotePath": {
       "label": "Remote Path",
       "placeholder": "openclaw-share",
@@ -121,6 +135,16 @@
           "s3",
           "custom"
         ]
+      },
+      "mode": {
+        "type": "string",
+        "enum": ["mirror", "mailbox", "bisync"]
+      },
+      "ingest": {
+        "type": "boolean"
+      },
+      "ingestPath": {
+        "type": "string"
       },
       "remotePath": {
         "type": "string"
