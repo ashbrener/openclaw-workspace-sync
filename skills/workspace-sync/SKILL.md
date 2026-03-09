@@ -31,6 +31,8 @@ Each sync cycle: (1) pushes workspace to cloud excluding `_inbox/` and `_outbox/
 
 Users drop files in the local `_outbox/` folder (created by the cloud provider's desktop app). Files arrive in the agent's `_inbox/`. The agent or a skill processes them from there.
 
+With `notifyOnInbox: true`, the agent is woken when files land in `_inbox`. A system event lists the new filenames so the agent can process them. Off by default — each notification costs an agent turn.
+
 ### Mirror mode with ingest
 
 With `ingest: true`, a local `inbox/` folder syncs one-way **up** to the remote workspace (additive only). For a more robust pattern, use `mailbox` mode instead.
@@ -111,6 +113,7 @@ Workspace sync is configured via the plugin entry in `openclaw.json`:
 | `mode` | **required** | `mailbox` (inbox/outbox, safest), `mirror` (remote->local), or `bisync` (bidirectional) |
 | `ingest` | `false` | Enable local inbox for sending files to the agent (mirror mode only) |
 | `ingestPath` | `"inbox"` | Local subfolder name for ingestion |
+| `notifyOnInbox` | `false` | Wake the agent when files arrive in `_inbox` (mailbox mode). Costs credits per notification. |
 | `remotePath` | `"openclaw-share"` | Folder name in cloud storage |
 | `localPath` | `"shared"` | Subfolder within workspace to sync |
 | `interval` | `0` | Background sync interval in seconds (0 = manual only, min 60) |

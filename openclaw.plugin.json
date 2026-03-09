@@ -19,6 +19,10 @@
       "help": "Local subfolder name for ingestion (default: inbox). Mirror mode only.",
       "advanced": true
     },
+    "notifyOnInbox": {
+      "label": "Notify on Inbox",
+      "help": "Wake the agent when files arrive in _inbox after a mailbox drain. Off by default to avoid burning credits."
+    },
     "remotePath": {
       "label": "Remote Path",
       "placeholder": "openclaw-share",
@@ -145,6 +149,9 @@
       },
       "ingestPath": {
         "type": "string"
+      },
+      "notifyOnInbox": {
+        "type": "boolean"
       },
       "remotePath": {
         "type": "string"

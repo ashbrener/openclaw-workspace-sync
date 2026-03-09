@@ -6,7 +6,7 @@
  */
 
 import type { WorkspaceSyncConfig } from "./types.js";
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import {
   isRcloneInstalled,
@@ -54,6 +54,7 @@ let currentSyncConfig: WorkspaceSyncConfig | null = null;
 let currentWorkspaceDir: string | null = null;
 let currentStateDir: string | null = null;
 let currentLogger: Logger | null = null;
+let currentOnInboxFiles: ((files: string[]) => void) | null = null;
 
 function scheduleNextSync(): void {
   if (!state.running || state.intervalMs <= 0) return;
@@ -179,6 +180,10 @@ async function doSync(): Promise<void> {
         `[workspace-sync] Mailbox: draining ${resolved.remoteName}:${outboxRemotePath} → ${inboxLocalPath}`,
       );
 
+      const inboxBefore = new Set(
+        existsSync(inboxLocalPath) ? readdirSync(inboxLocalPath) : [],
+      );
+
       const drainResult = await runMove({
         configPath: resolved.configPath,
         remoteName: resolved.remoteName,
@@ -191,6 +196,18 @@ async function doSync(): Promise<void> {
 
       if (drainResult.ok) {
         logger.info("[workspace-sync] Mailbox drain completed");
+
+        if (currentOnInboxFiles) {
+          const inboxAfter = existsSync(inboxLocalPath) ? readdirSync(inboxLocalPath) : [];
+          const newFiles = inboxAfter.filter((f) => !inboxBefore.has(f));
+          if (newFiles.length > 0) {
+            try {
+              currentOnInboxFiles(newFiles);
+            } catch (err) {
+              logger.warn(`[workspace-sync] Inbox notification error: ${err instanceof Error ? err.message : String(err)}`);
+            }
+          }
+        }
       } else {
         logger.warn(`[workspace-sync] Mailbox drain failed: ${drainResult.error}`);
       }
@@ -313,6 +330,7 @@ export function startSyncManager(
   workspaceDir: string,
   stateDir: string,
   logger: Logger,
+  opts?: { onInboxFiles?: (files: string[]) => void },
 ): void {
   stopSyncManager();
 
@@ -320,6 +338,7 @@ export function startSyncManager(
   currentWorkspaceDir = workspaceDir;
   currentStateDir = stateDir;
   currentLogger = logger;
+  currentOnInboxFiles = opts?.onInboxFiles ?? null;
 
   if (!syncConfig.provider || syncConfig.provider === "off") {
     logger.info("[workspace-sync] Workspace sync not configured");
@@ -377,6 +396,7 @@ export function stopSyncManager(): void {
   currentWorkspaceDir = null;
   currentStateDir = null;
   currentLogger = null;
+  currentOnInboxFiles = null;
 }
 
 export function getSyncManagerStatus(): {

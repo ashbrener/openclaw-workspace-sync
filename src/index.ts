@@ -652,7 +652,38 @@ const workspaceSyncPlugin = {
 
         const wsDir = ctx.workspaceDir ?? api.resolvePath("workspace");
 
-        startSyncManager(syncConfig, wsDir, ctx.stateDir, ctx.logger);
+        let onInboxFiles: ((files: string[]) => void) | undefined;
+        if (syncConfig.notifyOnInbox) {
+          onInboxFiles = (files) => {
+            const listing = files.length <= 5
+              ? files.join(", ")
+              : `${files.slice(0, 5).join(", ")} and ${files.length - 5} more`;
+            const text = `[workspace-sync] New files in _inbox: ${listing}`;
+
+            const cfg = api.config as Record<string, any>;
+            const agents = cfg?.agents?.list ?? [];
+            const defaultAgentId =
+              (agents.find((a: any) => a?.default)?.id ?? agents[0]?.id ?? "main")
+                .trim().toLowerCase() || "main";
+            const mainKey = (cfg?.session?.mainKey ?? "main").trim().toLowerCase() || "main";
+            const sessionKey = cfg?.session?.scope === "global"
+              ? "global"
+              : `agent:${defaultAgentId}:${mainKey}`;
+
+            api.logger.info(`${text} (notifying session ${sessionKey})`);
+
+            try {
+              api.runtime.system.enqueueSystemEvent(text, { sessionKey });
+              api.runtime.system.requestHeartbeatNow({ reason: "workspace-sync:inbox" });
+            } catch (err) {
+              api.logger.warn(
+                `[workspace-sync] Failed to notify agent: ${err instanceof Error ? err.message : String(err)}`,
+              );
+            }
+          };
+        }
+
+        startSyncManager(syncConfig, wsDir, ctx.stateDir, ctx.logger, { onInboxFiles });
       },
       stop: () => {
         stopSyncManager();

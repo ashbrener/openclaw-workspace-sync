@@ -28,6 +28,8 @@ export type WorkspaceSyncConfig = {
   ingest?: boolean;
   /** Local subfolder name for ingestion, relative to localPath. Default: "inbox". Mirror mode only. */
   ingestPath?: string;
+  /** Notify the agent when files arrive in _inbox after a mailbox drain. Off by default to avoid waking the agent and burning credits. */
+  notifyOnInbox?: boolean;
   remotePath?: string;
   localPath?: string;
   interval?: number;

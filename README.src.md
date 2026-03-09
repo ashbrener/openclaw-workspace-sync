@@ -72,13 +72,26 @@ On startup, the plugin bootstraps both directories:
 
 Because the push explicitly excludes `_inbox/**` and `_outbox/**`, there is no risk of sync loops or accidental overwrites. Files only flow in one direction through each channel.
 
+#### Inbox notifications (optional)
+
+By default, mailbox mode is silent — files land in `_inbox` without waking the agent. This keeps costs at zero.
+
+If you want the agent to react when files arrive, set `"notifyOnInbox": true`. After each drain that moves files, the plugin injects a system event like:
+
+> `[workspace-sync] New files in _inbox: report.pdf, data.csv`
+
+This wakes the agent on its next heartbeat. The agent sees the message and can process the files — for example, reading, summarizing, or filing them.
+
+**This costs credits.** Each notification triggers an agent turn. Only enable it if you want the agent to actively respond to incoming files.
+
 ```json
 {
   "mode": "mailbox",
   "provider": "dropbox",
   "remotePath": "",
   "localPath": "/",
-  "interval": 60
+  "interval": 180,
+  "notifyOnInbox": true
 }
 ```
 
@@ -273,6 +286,7 @@ Add to your `openclaw.json`:
 | `mode` | string | **required** | `mailbox` \| `mirror` \| `bisync` — see [Sync modes](#sync-modes-breaking-change-in-v20) |
 | `ingest` | boolean | `false` | Enable local inbox for sending files to the agent (mirror mode only) |
 | `ingestPath` | string | `"inbox"` | Local subfolder name for ingestion (relative to `localPath`) |
+| `notifyOnInbox` | boolean | `false` | Wake the agent when files arrive in `_inbox` (mailbox mode). Off by default — enabling this costs LLM credits per notification. |
 | `remotePath` | string | `"openclaw-share"` | Folder name in cloud storage |
 | `localPath` | string | `"shared"` | Subfolder within workspace to sync |
 | `interval` | number | `0` | Background sync interval in seconds (0 = manual only, min 60) |
