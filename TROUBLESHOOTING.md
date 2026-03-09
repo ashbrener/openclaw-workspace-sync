@@ -85,6 +85,26 @@ rclone sync <remote>:<path> /data/workspace/ --config <config-path> --verbose
 # Ctrl+B, D to detach; tmux attach -t sync to reconnect
 ```
 
+### Dropbox rate limiting (`too_many_requests`)
+
+**Cause:** Dropbox enforces API rate limits. Each sync cycle checks every file in the workspace, so large workspaces (10k+ files) use many API calls. If the sync interval is shorter than the scan time, cycles overlap and requests pile up.
+
+**Symptoms:** Logs show `NOTICE: Error too_many_requests/... Trying again in 300 seconds`. Sync stalls for 5 minutes waiting for the retry.
+
+**Fix:**
+1. Increase `interval` — if a scan takes ~2 minutes, set interval to at least 180 (3 min), ideally 300 (5 min)
+2. Add more `exclude` patterns to reduce the number of files scanned:
+   ```json
+   "exclude": [
+     "**/node_modules/**",
+     "**/.git/**",
+     "**/__pycache__/**",
+     "**/dist/**",
+     "**/.cache/**"
+   ]
+   ```
+3. If already rate-limited, wait 5–10 minutes before the next cycle — rclone retries automatically
+
 ### "directory not found" with Dropbox app folder
 
 **Cause:** Your `remotePath` is set to the app folder name (e.g. `"openclaw-sync"`) instead of `""`. With Dropbox app folders, the app folder IS the root — rclone sees it as `/`.

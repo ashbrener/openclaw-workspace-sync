@@ -488,6 +488,14 @@ Benefits:
 - If token is compromised, blast radius is limited
 - Clean separation — sync folder lives under `Apps/<your-app-name>/`
 
+### Dropbox rate limiting
+
+Dropbox enforces API rate limits (`too_many_requests`). If your workspace has many files (10k+), each sync cycle can consume a large number of API calls just for checking. To avoid hitting limits:
+
+- **Set `interval` high enough** for the sync to complete between cycles. A workspace with ~40k files takes ~2 minutes to scan. An `interval` of 180 (3 min) is the minimum; 300 (5 min) is safer.
+- **Use `exclude` patterns liberally** — skip `node_modules`, `.git`, `__pycache__`, build output, and anything you don't need synced. Fewer files = fewer API calls.
+- **If you see `too_many_requests` errors** in the logs, increase the interval and add more excludes.
+
 ## Understanding sync safety
 
 Cloud sync involves two copies of your data. When things go wrong, one side can overwrite the other. Here is what to keep in mind:
