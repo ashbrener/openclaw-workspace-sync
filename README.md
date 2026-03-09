@@ -112,25 +112,43 @@ If you are running on a container platform, `mailbox` mode is strongly recommend
 
 ## Before your first sync
 
-Getting the initial state right prevents data loss. What you need to do depends on your sync mode:
+Getting the initial state right prevents data loss. Each mode has different requirements:
 
-| Mode | First-sync direction | Starting requirement |
-|------|---------------------|---------------------|
-| `mailbox` | Local → cloud (push) | Local must match remote, or be the source of truth. If local is empty/stale, the push will delete files on cloud. |
-| `mirror` | Cloud → local (pull) | Safe from any state. Local can be empty — the pull downloads everything. |
-| `bisync` | Both directions | Both sides must be aligned. A `--resync` copies everything from both sides — stale files on either side will propagate. |
+### `mailbox` mode — starting state
 
-**Recommended first-time steps for `mailbox` and `bisync`:**
+The first sync **pushes** your local workspace to the cloud. This means rclone makes cloud match local exactly — any files on cloud that don't exist locally will be **deleted**.
 
-1. Start with an empty local workspace folder, **or**
-2. Manually pull from cloud first to align local with remote:
-   ```bash
-   rclone sync <remote>:<path> /local/workspace/ --config <config-path> --verbose
-   ```
-3. Verify local matches remote before enabling the plugin
-4. Run a `--dry-run` to confirm no unexpected deletions
+**Recommended starting state:** Local workspace is the source of truth (the agent has been writing here), or local and remote are already identical.
 
-For `mirror` mode, no preparation is needed — the first sync simply downloads the workspace.
+**If remote is the source of truth** (e.g. you've been syncing manually or switching from another mode), pull first:
+
+```bash
+rclone sync <remote>:<path> /data/workspace/ --config <config-path> \
+  --exclude '**/.DS_Store' --exclude '**/.git/**' \
+  --exclude '**/__pycache__/**' --exclude '**/node_modules/**' \
+  --verbose
+```
+
+Then verify local matches remote before enabling the plugin.
+
+### `mirror` mode — starting state
+
+The first sync **pulls** from cloud to local. Local can be empty, stale, or corrupted — the pull simply overwrites it. **No preparation needed.**
+
+### `bisync` mode — starting state
+
+The first sync requires `--resync`, which copies everything from both sides to the other. Any stale or unwanted files on either side will propagate.
+
+**Recommended starting state:** Both sides are identical, or one side is empty and the other has the data you want. Verify both before running `--resync`.
+
+### General first-sync checklist
+
+1. Run a `--dry-run` first to see what would happen: `openclaw workspace-sync sync --dry-run`
+2. Check the output for unexpected deletions
+3. If everything looks right, run the actual sync
+4. Only then enable periodic sync (`interval` in config)
+
+> For maintenance, recovery, and common problems, see [TROUBLESHOOTING.md](./TROUBLESHOOTING.md).
 
 ## Setup sequence
 
@@ -446,6 +464,8 @@ Cloud sync involves two copies of your data. When things go wrong, one side can 
 - Syncing very large directories (use `exclude` patterns liberally)
 
 **If in doubt, use `mailbox` mode.** It gives you a live local mirror of the workspace and a clean way to send files to the agent, with no risk of data loss.
+
+> For recovery procedures, mode switching, and maintenance tips, see [TROUBLESHOOTING.md](./TROUBLESHOOTING.md).
 
 ## Important: `--resync` is destructive (bisync only)
 

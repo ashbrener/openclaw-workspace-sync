@@ -29,6 +29,7 @@
     "skills",
     "openclaw.plugin.json",
     "README.md",
+    "TROUBLESHOOTING.md",
     "LICENSE"
   ],
   "dependencies": {
