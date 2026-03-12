@@ -182,7 +182,7 @@ rclone ls cloud:openclaw-share
 
 ## Encrypted backups
 
-Add a `backup` block to the plugin config for automated encrypted snapshots to your own cloud storage (S3, R2, B2, etc.).
+Add a `backup` block to the plugin config for automated encrypted snapshots to your own cloud storage (S3, R2, B2, etc.). Backups stream directly (`tar | rclone rcat`) — no local temp files, so they work even when disk space is tight.
 
 ### Backup commands
 

@@ -610,10 +610,12 @@ Back up your entire agent system — workspace, config, cron jobs, memory, sessi
 
 ### How it works
 
-1. The plugin archives the selected items into a timestamped `.tar.gz`
-2. Optionally encrypts it with AES-256 (client-side, before upload)
+1. **Streams directly** — `tar | [openssl enc] | rclone rcat` piped straight to the remote. Zero local temp files, zero extra disk needed. A 10 GB workspace on a 1 GB free volume? No problem.
+2. Optionally encrypts with AES-256 (client-side, before upload) via `openssl`
 3. Uploads via rclone to any supported provider (S3, R2, Backblaze B2, Dropbox, etc.)
 4. Prunes old snapshots based on your retention policy
+
+> **Disk-constrained?** Because backups stream directly, you don't need any free disk space for the backup itself. Only the restore downloads to a staging directory.
 
 ### Configuration
 

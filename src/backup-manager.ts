@@ -1,15 +1,14 @@
 /**
  * Backup manager — encrypted snapshot backups to cloud storage.
  *
- * Creates timestamped tar.gz archives of workspace, config, cron, memory, etc.,
- * optionally encrypts them with AES-256, uploads via rclone, and prunes old snapshots.
+ * Streams tar | [openssl enc] | rclone rcat directly to the remote —
+ * zero local disk usage. Optionally encrypts with AES-256 via openssl.
+ * Prunes old snapshots based on retention policy.
  */
 
 import { execFile, spawn } from "node:child_process";
-import { createReadStream, createWriteStream, existsSync, mkdirSync, readdirSync, rmSync, statSync, unlinkSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { dirname, join, basename } from "node:path";
-import { pipeline } from "node:stream/promises";
-import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from "node:crypto";
 import type { BackupConfig, BackupIncludeItem, BackupRetain, WorkspaceSyncConfig, WorkspaceSyncProvider } from "./types.js";
 import {
   getRcloneBinary,
@@ -65,86 +64,98 @@ function resolveIncludePaths(
 
 // ── Archive ──────────────────────────────────────────────────────────
 
-function createTarGz(
+function buildTarArgs(
   sources: Array<{ item: string; path: string }>,
-  outputPath: string,
   exclude: string[],
-  logger: Logger,
-): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const dir = dirname(outputPath);
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+): string[] {
+  const args = ["cz"];
 
-    const args = ["czf", outputPath];
+  for (const pattern of exclude) {
+    args.push(`--exclude=${pattern}`);
+  }
 
-    for (const pattern of exclude) {
-      args.push(`--exclude=${pattern}`);
+  for (const src of sources) {
+    args.push("-C", dirname(src.path), basename(src.path));
+  }
+
+  return args;
+}
+
+/**
+ * Stream tar output directly to rclone rcat — no local temp file needed.
+ * For encryption, pipes through openssl enc in between.
+ */
+async function streamBackup(params: {
+  sources: Array<{ item: string; path: string }>;
+  exclude: string[];
+  remoteDest: string;
+  configPath: string;
+  encrypt: boolean;
+  passphrase?: string;
+  logger: Logger;
+}): Promise<{ ok: true; sizeBytes: number } | { ok: false; error: string }> {
+  const { sources, exclude, remoteDest, configPath, encrypt, passphrase, logger } = params;
+
+  const rcloneBinary = await getRcloneBinary();
+  const tarArgs = buildTarArgs(sources, exclude);
+
+  return new Promise((resolve) => {
+    const tar = spawn("tar", tarArgs, { stdio: ["ignore", "pipe", "pipe"] });
+    let lastStdout = tar.stdout;
+
+    if (encrypt && passphrase) {
+      const enc = spawn("openssl", [
+        "enc", "-aes-256-cbc", "-salt", "-pbkdf2", "-iter", "100000",
+        "-pass", `pass:${passphrase}`,
+      ], { stdio: ["pipe", "pipe", "pipe"] });
+
+      tar.stdout.pipe(enc.stdin);
+      enc.stderr.on("data", (chunk: Buffer) => {
+        const msg = chunk.toString().trim();
+        if (msg) logger.warn(`[backup] openssl: ${msg}`);
+      });
+      lastStdout = enc.stdout;
     }
 
-    for (const src of sources) {
-      const stat = statSync(src.path);
-      if (stat.isDirectory()) {
-        args.push("-C", dirname(src.path), basename(src.path));
+    const rcat = spawn(rcloneBinary, [
+      "rcat", remoteDest, "--config", configPath,
+    ], { stdio: ["pipe", "pipe", "pipe"] });
+
+    lastStdout.pipe(rcat.stdin);
+
+    let sizeBytes = 0;
+    lastStdout.on("data", (chunk: Buffer) => {
+      sizeBytes += chunk.length;
+    });
+
+    let tarErr = "";
+    tar.stderr.on("data", (chunk: Buffer) => { tarErr += chunk.toString(); });
+
+    let rcatErr = "";
+    rcat.stderr.on("data", (chunk: Buffer) => { rcatErr += chunk.toString(); });
+
+    rcat.on("close", (code) => {
+      if (code !== 0) {
+        resolve({ ok: false, error: `rclone rcat failed (exit ${code}): ${rcatErr}` });
+      } else if (tarErr && !tarErr.includes("Removing leading")) {
+        resolve({ ok: false, error: `tar warnings: ${tarErr}` });
       } else {
-        args.push("-C", dirname(src.path), basename(src.path));
+        resolve({ ok: true, sizeBytes });
       }
-    }
+    });
 
-    logger.info(`[backup] Creating archive: ${outputPath}`);
-
-    execFile("tar", args, { maxBuffer: 10_000_000 }, (err, _stdout, stderr) => {
-      if (err) {
-        reject(new Error(`tar failed: ${stderr || err.message}`));
-        return;
-      }
-      resolve();
+    tar.on("error", (err) => {
+      resolve({ ok: false, error: `tar spawn failed: ${err.message}` });
+    });
+    rcat.on("error", (err) => {
+      resolve({ ok: false, error: `rclone rcat spawn failed: ${err.message}` });
     });
   });
 }
 
 // ── Encryption ───────────────────────────────────────────────────────
-
-const SALT_LEN = 16;
-const IV_LEN = 16;
-const KEY_LEN = 32;
-
-function deriveKey(passphrase: string, salt: Buffer): Buffer {
-  return scryptSync(passphrase, salt, KEY_LEN);
-}
-
-async function encryptFile(inputPath: string, outputPath: string, passphrase: string): Promise<void> {
-  const salt = randomBytes(SALT_LEN);
-  const iv = randomBytes(IV_LEN);
-  const key = deriveKey(passphrase, salt);
-  const cipher = createCipheriv("aes-256-cbc", key, iv);
-
-  const out = createWriteStream(outputPath);
-  out.write(salt);
-  out.write(iv);
-
-  const input = createReadStream(inputPath);
-  await pipeline(input, cipher, out);
-}
-
-async function decryptFile(inputPath: string, outputPath: string, passphrase: string): Promise<void> {
-  const fd = await import("node:fs/promises");
-  const handle = await fd.open(inputPath, "r");
-  try {
-    const saltBuf = Buffer.alloc(SALT_LEN);
-    const ivBuf = Buffer.alloc(IV_LEN);
-    await handle.read(saltBuf, 0, SALT_LEN, 0);
-    await handle.read(ivBuf, 0, IV_LEN, SALT_LEN);
-
-    const key = deriveKey(passphrase, saltBuf);
-    const decipher = createDecipheriv("aes-256-cbc", key, ivBuf);
-
-    const input = createReadStream(inputPath, { start: SALT_LEN + IV_LEN });
-    const out = createWriteStream(outputPath);
-    await pipeline(input, decipher, out);
-  } finally {
-    await handle.close();
-  }
-}
+// Backup/restore use openssl CLI pipes for streaming (no temp files).
+// The encryption constants below are kept for potential offline tooling.
 
 // ── rclone upload / list / delete ────────────────────────────────────
 
@@ -198,39 +209,6 @@ function ensureBackupRcloneConfig(
   ensureRcloneConfigFromConfig(effectiveSyncConfig, configPath, remoteName);
 }
 
-async function uploadFile(
-  localPath: string,
-  configPath: string,
-  remoteName: string,
-  remotePath: string,
-  logger: Logger,
-): Promise<{ ok: true } | { ok: false; error: string }> {
-  try {
-    const binary = await getRcloneBinary();
-    const dest = remotePath ? `${remoteName}:${remotePath}` : `${remoteName}:`;
-    const args = [
-      "copyto",
-      localPath,
-      `${dest}/${basename(localPath)}`,
-      "--config", configPath,
-    ];
-
-    logger.info(`[backup] Uploading ${basename(localPath)} → ${dest}/`);
-
-    return new Promise((resolve) => {
-      execFile(binary, args, { timeout: 600_000 }, (err, _stdout, stderr) => {
-        if (err) {
-          resolve({ ok: false, error: stderr || err.message });
-        } else {
-          resolve({ ok: true });
-        }
-      });
-    });
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) };
-  }
-}
-
 async function listSnapshots(
   configPath: string,
   remoteName: string,
@@ -273,35 +251,6 @@ async function deleteRemoteFile(
       resolve();
     });
   });
-}
-
-async function downloadFile(
-  configPath: string,
-  remoteName: string,
-  remotePath: string,
-  fileName: string,
-  localPath: string,
-  logger: Logger,
-): Promise<{ ok: true } | { ok: false; error: string }> {
-  try {
-    const binary = await getRcloneBinary();
-    const remote = remotePath ? `${remoteName}:${remotePath}/${fileName}` : `${remoteName}:${fileName}`;
-    const args = ["copyto", remote, localPath, "--config", configPath];
-
-    logger.info(`[backup] Downloading ${fileName} → ${localPath}`);
-
-    return new Promise((resolve) => {
-      execFile(binary, args, { timeout: 600_000 }, (err, _stdout, stderr) => {
-        if (err) {
-          resolve({ ok: false, error: stderr || err.message });
-        } else {
-          resolve({ ok: true });
-        }
-      });
-    });
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) };
-  }
 }
 
 // ── Retention / pruning ──────────────────────────────────────────────
@@ -422,51 +371,34 @@ export async function runBackup(params: {
   logger.info(`[backup] Starting backup: ${existing.map((p) => p.item).join(", ")}`);
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, "").slice(0, 15) + "Z";
-  const tmpDir = join(stateDir, ".backup-tmp");
-  if (!existsSync(tmpDir)) mkdirSync(tmpDir, { recursive: true });
+  const ext = doEncrypt ? ".tar.gz.enc" : ".tar.gz";
+  const snapshotName = `backup-${timestamp}${ext}`;
 
-  const archiveName = `backup-${timestamp}.tar.gz`;
-  const archivePath = join(tmpDir, archiveName);
+  const dest = remotePath ? `${remoteName}:${remotePath}/${snapshotName}` : `${remoteName}:${snapshotName}`;
+
+  logger.info(`[backup] Streaming to ${dest} (no local temp file needed)`);
 
   try {
-    await createTarGz(existing, archivePath, excludePatterns, logger);
+    const result = await streamBackup({
+      sources: existing,
+      exclude: excludePatterns,
+      remoteDest: dest,
+      configPath,
+      encrypt: doEncrypt,
+      passphrase,
+      logger,
+    });
 
-    let uploadPath = archivePath;
-    let uploadName = archiveName;
-
-    if (doEncrypt && passphrase) {
-      const encPath = `${archivePath}.enc`;
-      logger.info("[backup] Encrypting snapshot (AES-256)");
-      await encryptFile(archivePath, encPath, passphrase);
-      unlinkSync(archivePath);
-      uploadPath = encPath;
-      uploadName = `${archiveName}.enc`;
+    if (isErr(result)) {
+      return { ok: false, error: result.error };
     }
 
-    const stat = statSync(uploadPath);
-    logger.info(`[backup] Snapshot size: ${(stat.size / 1024 / 1024).toFixed(1)} MB`);
-
-    const uploadResult = await uploadFile(uploadPath, configPath, remoteName, remotePath, logger);
-
-    unlinkSync(uploadPath);
-
-    if (isErr(uploadResult)) {
-      return { ok: false, error: `Upload failed: ${uploadResult.error}` };
-    }
-
-    logger.info(`[backup] Snapshot uploaded: ${uploadName}`);
+    logger.info(`[backup] Snapshot uploaded: ${snapshotName} (~${(result.sizeBytes / 1024 / 1024).toFixed(1)} MB)`);
 
     await pruneSnapshots(configPath, remoteName, remotePath, backup.retain, logger);
 
-    return {
-      ok: true,
-      snapshotName: uploadName,
-      encrypted: doEncrypt,
-      sizeBytes: stat.size,
-    };
+    return { ok: true, snapshotName, encrypted: doEncrypt, sizeBytes: result.sizeBytes };
   } catch (err) {
-    if (existsSync(archivePath)) unlinkSync(archivePath);
-    if (existsSync(`${archivePath}.enc`)) unlinkSync(`${archivePath}.enc`);
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
@@ -558,45 +490,67 @@ export async function runRestore(params: {
 
   logger.info(`[backup] Restoring snapshot: ${targetSnapshot}`);
 
-  const tmpDir = join(stateDir, ".backup-tmp");
-  if (!existsSync(tmpDir)) mkdirSync(tmpDir, { recursive: true });
+  const restoreDir = restoreTo;
+  if (!existsSync(restoreDir)) mkdirSync(restoreDir, { recursive: true });
 
-  const downloadPath = join(tmpDir, targetSnapshot);
+  const rcloneBinary = await getRcloneBinary();
+  const remoteSrc = remotePath
+    ? `${remoteName}:${remotePath}/${targetSnapshot}`
+    : `${remoteName}:${targetSnapshot}`;
 
   try {
-    const dlResult = await downloadFile(configPath, remoteName, remotePath, targetSnapshot, downloadPath, logger);
-    if (isErr(dlResult)) return { ok: false, error: `Download failed: ${dlResult.error}` };
-
-    let archivePath = downloadPath;
-
-    if (targetSnapshot.endsWith(".enc")) {
-      if (!passphrase) return { ok: false, error: "Snapshot is encrypted but no passphrase" };
-      const decPath = downloadPath.replace(/\.enc$/, "");
-      logger.info("[backup] Decrypting snapshot");
-      await decryptFile(downloadPath, decPath, passphrase);
-      unlinkSync(downloadPath);
-      archivePath = decPath;
-    }
-
-    const restoreDir = restoreTo;
-    if (!existsSync(restoreDir)) mkdirSync(restoreDir, { recursive: true });
-
-    logger.info(`[backup] Extracting to ${restoreDir}`);
+    logger.info(`[backup] Streaming restore to ${restoreDir} (no local temp file needed)`);
 
     await new Promise<void>((resolve, reject) => {
-      execFile("tar", ["xzf", archivePath, "-C", restoreDir], { timeout: 300_000 }, (err) => {
-        if (err) reject(new Error(`tar extract failed: ${err.message}`));
+      const rcat = spawn(rcloneBinary, [
+        "cat", remoteSrc, "--config", configPath,
+      ], { stdio: ["ignore", "pipe", "pipe"] });
+
+      let lastStdout = rcat.stdout;
+
+      if (targetSnapshot.endsWith(".enc")) {
+        if (!passphrase) { reject(new Error("Snapshot is encrypted but no passphrase")); return; }
+        const dec = spawn("openssl", [
+          "enc", "-d", "-aes-256-cbc", "-salt", "-pbkdf2", "-iter", "100000",
+          "-pass", `pass:${passphrase}`,
+        ], { stdio: ["pipe", "pipe", "pipe"] });
+
+        rcat.stdout.pipe(dec.stdin);
+        dec.stderr.on("data", (chunk: Buffer) => {
+          const msg = chunk.toString().trim();
+          if (msg) logger.warn(`[backup] openssl: ${msg}`);
+        });
+        lastStdout = dec.stdout;
+      }
+
+      const tar = spawn("tar", ["xz", "-C", restoreDir], { stdio: ["pipe", "ignore", "pipe"] });
+      lastStdout.pipe(tar.stdin);
+
+      let tarErr = "";
+      tar.stderr.on("data", (chunk: Buffer) => { tarErr += chunk.toString(); });
+
+      let rcatErr = "";
+      rcat.stderr.on("data", (chunk: Buffer) => { rcatErr += chunk.toString(); });
+
+      tar.on("close", (code) => {
+        if (code !== 0) reject(new Error(`tar extract failed (exit ${code}): ${tarErr}`));
         else resolve();
       });
-    });
 
-    unlinkSync(archivePath);
+      rcat.on("close", (code) => {
+        if (code !== 0 && code !== null) {
+          reject(new Error(`rclone cat failed (exit ${code}): ${rcatErr}`));
+        }
+      });
+
+      rcat.on("error", (err) => reject(err));
+      tar.on("error", (err) => reject(err));
+    });
 
     logger.info(`[backup] Restore complete: ${targetSnapshot} → ${restoreDir}`);
 
     return { ok: true, snapshotName: targetSnapshot, restoredTo: restoreDir };
   } catch (err) {
-    if (existsSync(downloadPath)) unlinkSync(downloadPath);
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
