@@ -610,6 +610,27 @@ Back up your entire agent system — workspace, config, cron jobs, memory, sessi
 
 ### How it works
 
+```mermaid
+flowchart LR
+    subgraph GW["Gateway"]
+        WS["/workspace"]
+        CFG["config / cron / memory"]
+    end
+    TAR["tar cz"]
+    ENC["openssl enc\n(AES-256)"]
+    RCAT["rclone rcat"]
+    subgraph REMOTE["Your Bucket (S3 / R2 / B2)"]
+        SNAP["backup-2026…Z.tar.gz.enc"]
+        OLD["older snapshots"]
+    end
+    WS --> TAR
+    CFG --> TAR
+    TAR -- "pipe" --> ENC
+    ENC -- "pipe" --> RCAT
+    RCAT --> SNAP
+    SNAP -. "retention prune" .-> OLD
+```
+
 1. **Streams directly** — `tar | [openssl enc] | rclone rcat` piped straight to the remote. Zero local temp files, zero extra disk needed. A 10 GB workspace on a 1 GB free volume? No problem.
 2. Optionally encrypts with AES-256 (client-side, before upload) via `openssl`
 3. Uploads via rclone to any supported provider (S3, R2, Backblaze B2, Dropbox, etc.)

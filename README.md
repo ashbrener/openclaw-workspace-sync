@@ -569,6 +569,10 @@ Back up your entire agent system — workspace, config, cron jobs, memory, sessi
 
 ### How it works
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ashbrener/openclaw-workspace-sync/main/docs/diagrams/mode-3.svg" alt="sync mode diagram" width="700" />
+</p>
+
 1. **Streams directly** — `tar | [openssl enc] | rclone rcat` piped straight to the remote. Zero local temp files, zero extra disk needed. A 10 GB workspace on a 1 GB free volume? No problem.
 2. Optionally encrypts with AES-256 (client-side, before upload) via `openssl`
 3. Uploads via rclone to any supported provider (S3, R2, Backblaze B2, Dropbox, etc.)
