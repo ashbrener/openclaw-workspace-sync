@@ -18,7 +18,20 @@ export type WorkspaceSyncProvider = "off" | "dropbox" | "gdrive" | "onedrive" | 
 export type WorkspaceSyncMode = "mirror" | "mailbox" | "bisync";
 
 /** What to include in a backup snapshot. */
-export type BackupIncludeItem = "workspace" | "config" | "cron" | "memory" | "sessions" | "credentials" | "skills";
+export type BackupIncludeItem =
+  | "workspace"
+  | "config"
+  | "cron"
+  | "memory"
+  | "sessions"
+  | "credentials"
+  | "skills"
+  | "hooks"
+  | "extensions"
+  | "env"
+  | "agents"
+  | "pages"
+  | "transcripts";
 
 /** Retention policy: a number (keep N most recent) or tiered object. */
 export type BackupRetain = number | {

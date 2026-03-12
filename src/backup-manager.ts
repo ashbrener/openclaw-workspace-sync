@@ -39,6 +39,8 @@ function resolveIncludePaths(
   workspaceDir: string,
   stateDir: string,
 ): Array<{ item: BackupIncludeItem; path: string; exists: boolean }> {
+  const extensionsDir = join(dirname(stateDir), "extensions");
+
   const map: Record<BackupIncludeItem, string> = {
     workspace: workspaceDir,
     config: join(stateDir, "openclaw.json"),
@@ -47,6 +49,12 @@ function resolveIncludePaths(
     sessions: join(stateDir, "sessions"),
     credentials: join(stateDir, "credentials"),
     skills: join(workspaceDir, "skills"),
+    hooks: join(stateDir, "hooks"),
+    extensions: existsSync(extensionsDir) ? extensionsDir : join(stateDir, "extensions"),
+    env: join(workspaceDir, ".env"),
+    agents: join(stateDir, "agents"),
+    pages: join(workspaceDir, "pages"),
+    transcripts: join(stateDir, "agents"),
   };
 
   return include.map((item) => {

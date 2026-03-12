@@ -157,7 +157,7 @@
     },
     "backup.include": {
       "label": "Backup Include",
-      "help": "What to include: workspace, config, cron, memory, sessions, credentials, skills"
+      "help": "What to include: workspace, config, cron, memory, sessions, credentials, skills, hooks, extensions, env, agents, pages, transcripts"
     },
     "backup.retain": {
       "label": "Retention",
@@ -255,7 +255,7 @@
             "type": "array",
             "items": {
               "type": "string",
-              "enum": ["workspace", "config", "cron", "memory", "sessions", "credentials", "skills"]
+              "enum": ["workspace", "config", "cron", "memory", "sessions", "credentials", "skills", "hooks", "extensions", "env", "agents", "pages", "transcripts"]
             }
           },
           "retain": {},

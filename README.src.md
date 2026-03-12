@@ -663,9 +663,15 @@ Add a `backup` block to your plugin config. The backup provider can differ from 
 | `config` | `openclaw.json` |
 | `cron` | Cron job schedules and state |
 | `memory` | Memory files (MEMORY.md, etc.) |
-| `sessions` | Session transcripts |
-| `credentials` | Auth credentials |
+| `sessions` | Session metadata and store |
+| `credentials` | Auth profile credentials |
 | `skills` | Skill files |
+| `hooks` | Webhook configurations and state (Gmail watch, custom hooks) |
+| `extensions` | Installed plugins/extensions (for reproducible restores) |
+| `env` | Environment variables file (`.env`) |
+| `agents` | Multi-agent state (per-agent sessions, subagent registry) |
+| `pages` | Custom pages served by the gateway |
+| `transcripts` | Full conversation logs (JSONL session transcripts) |
 
 Default: `["workspace", "config", "cron", "memory"]`
 
