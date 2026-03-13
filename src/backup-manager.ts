@@ -16,8 +16,6 @@ import {
   isRcloneConfigured,
   ensureRcloneConfigFromConfig,
   getDefaultRcloneConfigPath,
-  generateRcloneConfig,
-  writeRcloneConfig,
 } from "./rclone.js";
 
 function isErr<T extends { ok: boolean }>(r: T): r is Extract<T, { ok: false }> {
@@ -38,7 +36,7 @@ function resolveIncludePaths(
   workspaceDir: string,
   stateDir: string,
 ): Array<{ item: BackupIncludeItem; path: string; exists: boolean }> {
-  const extensionsDir = join(dirname(stateDir), "extensions");
+  const extensionsDir = join(stateDir, "extensions");
 
   const map: Record<BackupIncludeItem, string> = {
     workspace: workspaceDir,
@@ -106,8 +104,11 @@ async function streamBackup(params: {
     if (encrypt && passphrase) {
       const enc = spawn("openssl", [
         "enc", "-aes-256-cbc", "-salt", "-pbkdf2", "-iter", "100000",
-        "-pass", `pass:${passphrase}`,
-      ], { stdio: ["pipe", "pipe", "pipe"] });
+        "-pass", "env:OPENCLAW_BACKUP_PASS",
+      ], {
+        stdio: ["pipe", "pipe", "pipe"],
+        env: { ...process.env, OPENCLAW_BACKUP_PASS: passphrase },
+      });
 
       tar.stdout.pipe(enc.stdin);
       enc.stderr.on("data", (chunk: Buffer) => {
@@ -153,29 +154,27 @@ async function streamBackup(params: {
   });
 }
 
-// ── Encryption ───────────────────────────────────────────────────────
-// Backup/restore use openssl CLI pipes for streaming (no temp files).
-// The encryption constants below are kept for potential offline tooling.
-
-// ── rclone upload / list / delete ────────────────────────────────────
+// ── rclone list / delete ─────────────────────────────────────────────
 
 function resolveBackupRcloneConfig(
   syncConfig: WorkspaceSyncConfig,
   backupConfig: BackupConfig,
   stateDir: string,
 ): { configPath: string; remoteName: string; remotePath: string; provider: WorkspaceSyncProvider } {
-  const provider = backupConfig.provider ?? syncConfig.provider ?? "s3";
+  const rawProvider = backupConfig.provider ?? syncConfig.provider;
+  const provider = (rawProvider === "off" || !rawProvider) ? "s3" : rawProvider;
   const remoteName = backupConfig.remoteName ?? "backup";
   const configPath = backupConfig.configPath ?? syncConfig.configPath ?? getDefaultRcloneConfigPath(stateDir);
 
-  let remotePath = backupConfig.remotePath ?? "";
+  let remotePath = (backupConfig.remotePath ?? "").replace(/^\/+|\/+$/g, "");
   if (backupConfig.bucket) {
-    remotePath = backupConfig.bucket;
+    remotePath = backupConfig.bucket.replace(/^\/+|\/+$/g, "");
   } else if (backupConfig.s3?.bucket) {
-    remotePath = backupConfig.s3.bucket;
+    remotePath = backupConfig.s3.bucket.replace(/^\/+|\/+$/g, "");
   }
-  if (backupConfig.prefix) {
-    remotePath = remotePath ? `${remotePath}/${backupConfig.prefix}` : backupConfig.prefix;
+  const prefix = (backupConfig.prefix ?? "").replace(/^\/+|\/+$/g, "");
+  if (prefix) {
+    remotePath = remotePath ? `${remotePath}/${prefix}` : prefix;
   }
 
   return { configPath, remoteName, remotePath, provider };
@@ -243,11 +242,15 @@ async function deleteRemoteFile(
   remoteName: string,
   remotePath: string,
   fileName: string,
+  logger: Logger,
 ): Promise<void> {
   const binary = await getRcloneBinary();
   const remote = remotePath ? `${remoteName}:${remotePath}/${fileName}` : `${remoteName}:${fileName}`;
   await new Promise<void>((resolve) => {
-    execFile(binary, ["deletefile", remote, "--config", configPath], { timeout: 30_000 }, () => {
+    execFile(binary, ["deletefile", remote, "--config", configPath], { timeout: 30_000 }, (err, _stdout, stderr) => {
+      if (err) {
+        logger.warn(`[backup] Failed to delete ${fileName}: ${stderr || err.message}`);
+      }
       resolve();
     });
   });
@@ -282,8 +285,8 @@ function selectSnapshotsToKeep(
   const monthlyCount = retain.monthly ?? 0;
 
   function extractDate(name: string): string | null {
-    const m = name.match(/backup-(\d{4}-\d{2}-\d{2})/);
-    return m ? m[1] : null;
+    const m = name.match(/backup-(\d{4})(\d{2})(\d{2})T/);
+    return m ? `${m[1]}-${m[2]}-${m[3]}` : null;
   }
 
   const seenDays = new Set<string>();
@@ -345,7 +348,8 @@ export async function runBackup(params: {
   }
 
   const include: BackupIncludeItem[] = backup.include ?? ["workspace", "config", "cron", "memory"];
-  const excludePatterns = backup.exclude ?? syncConfig.exclude ?? ["**/.git/**", "**/node_modules/**"];
+  const excludePatterns = (backup.exclude ?? syncConfig.exclude ?? ["**/.git/**", "**/node_modules/**"])
+    .map((p) => p.replace(/^\*\*\//, "*/").replace(/\/\*\*$/, "/*"));
   const doEncrypt = backup.encrypt ?? false;
   const passphrase = backup.passphrase;
 
@@ -370,7 +374,7 @@ export async function runBackup(params: {
 
   logger.info(`[backup] Starting backup: ${existing.map((p) => p.item).join(", ")}`);
 
-  const timestamp = new Date().toISOString().replace(/[:.]/g, "").slice(0, 15) + "Z";
+  const timestamp = new Date().toISOString().replace(/[-:.]/g, "").replace("T", "T").slice(0, 16) + "Z";
   const ext = doEncrypt ? ".tar.gz.enc" : ".tar.gz";
   const snapshotName = `backup-${timestamp}${ext}`;
 
@@ -424,7 +428,7 @@ async function pruneSnapshots(
   logger.info(`[backup] Pruning ${toDelete.length} old snapshot(s), keeping ${keep.size}`);
 
   for (const file of toDelete) {
-    await deleteRemoteFile(configPath, remoteName, remotePath, file);
+    await deleteRemoteFile(configPath, remoteName, remotePath, file, logger);
     logger.info(`[backup] Deleted: ${file}`);
   }
 }
@@ -512,8 +516,11 @@ export async function runRestore(params: {
         if (!passphrase) { reject(new Error("Snapshot is encrypted but no passphrase")); return; }
         const dec = spawn("openssl", [
           "enc", "-d", "-aes-256-cbc", "-salt", "-pbkdf2", "-iter", "100000",
-          "-pass", `pass:${passphrase}`,
-        ], { stdio: ["pipe", "pipe", "pipe"] });
+          "-pass", "env:OPENCLAW_BACKUP_PASS",
+        ], {
+          stdio: ["pipe", "pipe", "pipe"],
+          env: { ...process.env, OPENCLAW_BACKUP_PASS: passphrase },
+        });
 
         rcat.stdout.pipe(dec.stdin);
         dec.stderr.on("data", (chunk: Buffer) => {
@@ -523,7 +530,7 @@ export async function runRestore(params: {
         lastStdout = dec.stdout;
       }
 
-      const tar = spawn("tar", ["xz", "-C", restoreDir], { stdio: ["pipe", "ignore", "pipe"] });
+      const tar = spawn("tar", ["xz", "--no-same-owner", "-C", restoreDir], { stdio: ["pipe", "ignore", "pipe"] });
       lastStdout.pipe(tar.stdin);
 
       let tarErr = "";
@@ -644,6 +651,7 @@ export function startBackupManager(
   }
 
   const effectiveInterval = Math.max(intervalSeconds, 300);
+  backup.interval = effectiveInterval;
   backupState.running = true;
 
   logger.info(`[backup] Backup service started — every ${effectiveInterval}s`);

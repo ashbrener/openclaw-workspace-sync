@@ -237,11 +237,12 @@
       },
       "backup": {
         "type": "object",
+        "additionalProperties": false,
         "properties": {
           "enabled": { "type": "boolean" },
           "provider": {
             "type": "string",
-            "enum": ["off", "dropbox", "gdrive", "onedrive", "s3", "custom"]
+            "enum": ["dropbox", "gdrive", "onedrive", "s3", "custom"]
           },
           "remoteName": { "type": "string" },
           "configPath": { "type": "string" },
@@ -258,7 +259,9 @@
               "enum": ["workspace", "config", "cron", "memory", "sessions", "credentials", "skills", "hooks", "extensions", "env", "agents", "pages", "transcripts"]
             }
           },
-          "retain": {},
+          "retain": {
+            "description": "Number of snapshots to keep, or {daily, weekly, monthly} object for tiered retention"
+          },
           "exclude": {
             "type": "array",
             "items": { "type": "string" }

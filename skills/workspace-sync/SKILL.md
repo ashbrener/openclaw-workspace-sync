@@ -217,7 +217,7 @@ openclaw workspace-sync backup status     # Check backup service status
 | `provider` | parent provider | Cloud provider (can differ from sync provider) |
 | `bucket` | — | S3/R2 bucket name |
 | `prefix` | `""` | Path prefix within the bucket |
-| `interval` | `86400` | Backup interval in seconds (min 300) |
+| `interval` | `86400` | Backup interval in seconds (clamped to min 300) |
 | `encrypt` | `false` | AES-256 client-side encryption |
 | `passphrase` | — | Encryption passphrase (use env var) |
 | `include` | `["workspace", "config", "cron", "memory"]` | What to back up |

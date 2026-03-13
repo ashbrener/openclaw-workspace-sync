@@ -613,7 +613,7 @@ Add a `backup` block to your plugin config. The backup provider can differ from 
 | `provider` | string | parent provider | Cloud provider for backup storage |
 | `bucket` | string | — | S3/R2 bucket name |
 | `prefix` | string | `""` | Path prefix within the bucket (e.g., `habibi/`) |
-| `interval` | number | `86400` | Backup interval in seconds (86400 = daily, min 300) |
+| `interval` | number | `86400` | Backup interval in seconds (86400 = daily; clamped to min 300) |
 | `encrypt` | boolean | `false` | Encrypt snapshots with AES-256 before upload |
 | `passphrase` | string | — | Encryption passphrase (use `${BACKUP_PASSPHRASE}` env var) |
 | `include` | string[] | see below | What to back up |
