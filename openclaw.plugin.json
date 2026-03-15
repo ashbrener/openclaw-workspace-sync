@@ -1,6 +1,10 @@
 {
   "id": "openclaw-workspace-sync",
   "uiHints": {
+    "sync": {
+      "label": "Sync Settings",
+      "help": "Nested sync config (preferred). Same fields as flat config: provider, mode, interval, etc."
+    },
     "provider": {
       "label": "Cloud Provider",
       "help": "Cloud storage provider for workspace sync"
@@ -166,8 +170,11 @@
   },
   "configSchema": {
     "type": "object",
-    "additionalProperties": false,
     "properties": {
+      "sync": {
+        "type": "object",
+        "description": "Nested sync config (preferred). Contains the same fields as the flat config: provider, mode, interval, remotePath, etc."
+      },
       "provider": {
         "type": "string",
         "enum": [

@@ -221,21 +221,36 @@ Add to your `openclaw.json`:
       "openclaw-workspace-sync": {
         "enabled": true,
         "config": {
-          "provider": "dropbox",
-          "mode": "mailbox",
-          "remotePath": "",
-          "localPath": "/",
-          "interval": 60,
-          "timeout": 1800,
-          "onSessionStart": true,
-          "onSessionEnd": false,
-          "exclude": [".git/**", "node_modules/**", "*.log"]
+          "sync": {
+            "provider": "dropbox",
+            "mode": "mailbox",
+            "remotePath": "",
+            "localPath": "/",
+            "interval": 60,
+            "timeout": 1800,
+            "onSessionStart": true,
+            "onSessionEnd": false,
+            "exclude": [".git/**", "node_modules/**", "*.log"]
+          },
+          "backup": {
+            "enabled": true,
+            "provider": "s3",
+            "bucket": "my-backups",
+            "prefix": "habibi/",
+            "interval": 86400,
+            "encrypt": true,
+            "passphrase": "${BACKUP_PASSPHRASE}",
+            "include": ["workspace", "config", "cron", "memory"],
+            "retain": 7
+          }
         }
       }
     }
   }
 }
 ```
+
+> **Flat format still works.** Putting `provider`, `mode`, etc. at the config root (without `sync`) is supported for backwards compatibility. The nested `{ sync, backup }` format is recommended for clarity.
 
 ### Config reference
 
@@ -582,15 +597,16 @@ Back up your entire agent system — workspace, config, cron jobs, memory, sessi
 
 ### Configuration
 
-Add a `backup` block to your plugin config. The backup provider can differ from your sync provider — sync to Dropbox for live mirror, backup to S3 for disaster recovery:
+Add `sync` and `backup` blocks to your plugin config. The backup provider can differ from your sync provider — sync to Dropbox for live mirror, backup to S3 for disaster recovery:
 
 ```json
 {
-  "provider": "dropbox",
-  "mode": "mailbox",
-  "remotePath": "",
-  "interval": 180,
-
+  "sync": {
+    "provider": "dropbox",
+    "mode": "mailbox",
+    "remotePath": "",
+    "interval": 180
+  },
   "backup": {
     "enabled": true,
     "provider": "s3",

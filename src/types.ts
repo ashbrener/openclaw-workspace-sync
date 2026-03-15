@@ -152,3 +152,21 @@ export type WorkspaceSyncConfig = {
     rcloneOptions?: Record<string, string>;
   };
 };
+
+/**
+ * Nested plugin config — preferred format.
+ *
+ * ```json
+ * { "sync": { "provider": "dropbox", ... }, "backup": { "enabled": true, ... } }
+ * ```
+ *
+ * The flat format (all keys at root level) is still supported for backwards
+ * compatibility and normalized internally.
+ */
+export type NestedPluginConfig = {
+  sync?: Omit<WorkspaceSyncConfig, "backup">;
+  backup?: BackupConfig;
+};
+
+/** Raw plugin config — either nested or flat (legacy). */
+export type RawPluginConfig = NestedPluginConfig | WorkspaceSyncConfig;

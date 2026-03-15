@@ -80,7 +80,7 @@ Lists files in the configured cloud storage path.
 
 ## Configuration
 
-Workspace sync is configured via the plugin entry in `openclaw.json`:
+Workspace sync is configured via the plugin entry in `openclaw.json`. The preferred format uses nested `sync` and `backup` blocks (flat config at root level is also supported):
 
 ```json
 {
@@ -89,15 +89,17 @@ Workspace sync is configured via the plugin entry in `openclaw.json`:
       "openclaw-workspace-sync": {
         "enabled": true,
         "config": {
-          "provider": "dropbox",
-          "mode": "mailbox",
-          "remotePath": "",
-          "localPath": "/",
-          "interval": 60,
-          "timeout": 1800,
-          "onSessionStart": true,
-          "onSessionEnd": true,
-          "exclude": [".git/**", "node_modules/**", "*.log"]
+          "sync": {
+            "provider": "dropbox",
+            "mode": "mailbox",
+            "remotePath": "",
+            "localPath": "/",
+            "interval": 60,
+            "timeout": 1800,
+            "onSessionStart": true,
+            "onSessionEnd": true,
+            "exclude": [".git/**", "node_modules/**", "*.log"]
+          }
         }
       }
     }
@@ -106,6 +108,8 @@ Workspace sync is configured via the plugin entry in `openclaw.json`:
 ```
 
 ### Config keys
+
+These keys live under `sync` in the nested format, or at the config root in flat format.
 
 | Key | Default | Description |
 |-----|---------|-------------|

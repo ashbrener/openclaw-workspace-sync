@@ -29,7 +29,7 @@ import {
   generateRcloneConfig,
   type RcloneSyncResult,
 } from "./rclone.js";
-import type { WorkspaceSyncConfig, WorkspaceSyncProvider } from "./types.js";
+import type { WorkspaceSyncConfig, WorkspaceSyncProvider, RawPluginConfig, NestedPluginConfig } from "./types.js";
 
 function isErr<T extends { ok: boolean }>(r: T): r is Extract<T, { ok: false }> {
   return !r.ok;
@@ -44,8 +44,26 @@ import {
   getBackupManagerStatus,
 } from "./backup-manager.js";
 
+/**
+ * Detect nested `{ sync, backup }` vs flat config and normalize to
+ * the internal WorkspaceSyncConfig shape.
+ */
 function parsePluginConfig(raw: Record<string, unknown> | undefined): WorkspaceSyncConfig {
   if (!raw) return {};
+
+  const hasSync = "sync" in raw && typeof raw.sync === "object" && raw.sync !== null;
+  const hasBackupTop = "backup" in raw && typeof raw.backup === "object" && raw.backup !== null;
+  const hasSyncFields = "provider" in raw || "mode" in raw || "remotePath" in raw || "interval" in raw;
+
+  if (hasSync && !hasSyncFields) {
+    const nested = raw as unknown as NestedPluginConfig;
+    const syncPart = (nested.sync ?? {}) as WorkspaceSyncConfig;
+    if (hasBackupTop) {
+      syncPart.backup = nested.backup;
+    }
+    return syncPart;
+  }
+
   return raw as WorkspaceSyncConfig;
 }
 
