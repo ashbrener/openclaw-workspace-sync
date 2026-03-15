@@ -221,21 +221,36 @@ Add to your `openclaw.json`:
       "openclaw-workspace-sync": {
         "enabled": true,
         "config": {
-          "provider": "dropbox",
-          "mode": "mailbox",
-          "remotePath": "",
-          "localPath": "/",
-          "interval": 60,
-          "timeout": 1800,
-          "onSessionStart": true,
-          "onSessionEnd": false,
-          "exclude": [".git/**", "node_modules/**", "*.log"]
+          "sync": {
+            "provider": "dropbox",
+            "mode": "mailbox",
+            "remotePath": "",
+            "localPath": "/",
+            "interval": 60,
+            "timeout": 1800,
+            "onSessionStart": true,
+            "onSessionEnd": false,
+            "exclude": [".git/**", "node_modules/**", "*.log"]
+          },
+          "backup": {
+            "enabled": true,
+            "provider": "s3",
+            "bucket": "my-backups",
+            "prefix": "habibi/",
+            "interval": 86400,
+            "encrypt": true,
+            "passphrase": "${BACKUP_PASSPHRASE}",
+            "include": ["workspace", "config", "cron", "memory"],
+            "retain": 7
+          }
         }
       }
     }
   }
 }
 ```
+
+> **Flat format still works.** Putting `provider`, `mode`, etc. at the config root (without `sync`) is supported for backwards compatibility. The nested `{ sync, backup }` format is recommended for clarity.
 
 ### Config reference
 
@@ -562,6 +577,171 @@ These recommendations apply regardless of whether you use this plugin. Cloud syn
 - **Sensitive files**: Don't sync secrets, API keys, or credentials
 - **Encryption**: Consider [rclone crypt](https://rclone.org/crypt/) for sensitive data
 - **App folder**: Use Dropbox app folder access for minimal permissions
+
+## Encrypted backups
+
+Back up your entire agent system — workspace, config, cron jobs, memory, sessions — as encrypted snapshots to your own cloud storage. Your bucket, your encryption key, zero monthly fees.
+
+### How it works
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ashbrener/openclaw-workspace-sync/main/docs/diagrams/mode-3.svg" alt="backup pipeline diagram" width="700" />
+</p>
+
+1. **Streams directly** — `tar | [openssl enc] | rclone rcat` piped straight to the remote. Zero local temp files, zero extra disk needed. A 10 GB workspace on a 1 GB free volume? No problem.
+2. Optionally encrypts with AES-256 (client-side, before upload) via `openssl`
+3. Uploads via rclone to any supported provider (S3, R2, Backblaze B2, Dropbox, etc.)
+4. Prunes old snapshots based on your retention policy
+
+> **Disk-constrained?** Because backups stream directly, you don't need any free disk space for the backup itself. Only the restore downloads to a staging directory.
+
+### Configuration
+
+Add `sync` and `backup` blocks to your plugin config. The backup provider can differ from your sync provider — sync to Dropbox for live mirror, backup to S3 for disaster recovery:
+
+```json
+{
+  "sync": {
+    "provider": "dropbox",
+    "mode": "mailbox",
+    "remotePath": "",
+    "interval": 180
+  },
+  "backup": {
+    "enabled": true,
+    "provider": "s3",
+    "bucket": "my-backups",
+    "prefix": "habibi/",
+    "interval": 86400,
+    "encrypt": true,
+    "passphrase": "${BACKUP_PASSPHRASE}",
+    "include": ["workspace", "config", "cron", "memory"],
+    "retain": { "daily": 7, "weekly": 4 }
+  }
+}
+```
+
+### Backup config reference
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `enabled` | boolean | `false` | Enable scheduled backups |
+| `provider` | string | parent provider | Cloud provider for backup storage |
+| `bucket` | string | — | S3/R2 bucket name |
+| `prefix` | string | `""` | Path prefix within the bucket (e.g., `habibi/`) |
+| `interval` | number | `86400` | Backup interval in seconds (86400 = daily; clamped to min 300) |
+| `encrypt` | boolean | `false` | Encrypt snapshots with AES-256 before upload |
+| `passphrase` | string | — | Encryption passphrase (use `${BACKUP_PASSPHRASE}` env var) |
+| `include` | string[] | see below | What to back up |
+| `retain` | number or object | `7` | Retention: `7` = keep 7 latest, or `{ daily: 7, weekly: 4 }` |
+| `exclude` | string[] | parent excludes | Glob patterns to exclude from workspace backup |
+
+### Include options
+
+| Item | What gets backed up |
+|------|---------------------|
+| `workspace` | The workspace directory (agent files, projects, etc.) |
+| `config` | `openclaw.json` |
+| `cron` | Cron job schedules and state |
+| `memory` | Memory files (MEMORY.md, etc.) |
+| `sessions` | Session metadata and store |
+| `credentials` | Auth profile credentials |
+| `skills` | Skill files |
+| `hooks` | Webhook configurations and state (Gmail watch, custom hooks) |
+| `extensions` | Installed plugins/extensions (for reproducible restores) |
+| `env` | Environment variables file (`.env`) |
+| `agents` | Multi-agent state (per-agent sessions, subagent registry) |
+| `pages` | Custom pages served by the gateway |
+| `transcripts` | Full conversation logs (JSONL session transcripts) |
+
+Default: `["workspace", "config", "cron", "memory"]`
+
+### CLI commands
+
+```bash
+# Create a backup now
+openclaw workspace-sync backup now
+
+# List available snapshots
+openclaw workspace-sync backup list
+
+# Restore the latest snapshot
+openclaw workspace-sync backup restore
+
+# Restore a specific snapshot
+openclaw workspace-sync backup restore --snapshot backup-20260310T020000Z.tar.gz.enc
+
+# Restore to a specific directory (safe — doesn't overwrite live data)
+openclaw workspace-sync backup restore --to /tmp/restore-test
+
+# Check backup service status
+openclaw workspace-sync backup status
+```
+
+### Restore safety
+
+By default, `restore` extracts to a staging directory (`~/.openclaw/.backup-restore/`), not directly over your live workspace. This lets you inspect the contents before copying them into place. Use `--to` to control where files land.
+
+### Provider examples
+
+**Cloudflare R2 (free tier: 10GB):**
+
+```json
+{
+  "backup": {
+    "enabled": true,
+    "provider": "s3",
+    "encrypt": true,
+    "passphrase": "${BACKUP_PASSPHRASE}",
+    "s3": {
+      "endpoint": "https://<account-id>.r2.cloudflarestorage.com",
+      "bucket": "openclaw-backups",
+      "region": "auto",
+      "accessKeyId": "${R2_ACCESS_KEY}",
+      "secretAccessKey": "${R2_SECRET_KEY}"
+    }
+  }
+}
+```
+
+**AWS S3:**
+
+```json
+{
+  "backup": {
+    "enabled": true,
+    "provider": "s3",
+    "encrypt": true,
+    "passphrase": "${BACKUP_PASSPHRASE}",
+    "s3": {
+      "bucket": "my-openclaw-backups",
+      "region": "us-east-1",
+      "accessKeyId": "${AWS_ACCESS_KEY_ID}",
+      "secretAccessKey": "${AWS_SECRET_ACCESS_KEY}"
+    }
+  }
+}
+```
+
+**Backblaze B2:**
+
+```json
+{
+  "backup": {
+    "enabled": true,
+    "provider": "s3",
+    "encrypt": true,
+    "passphrase": "${BACKUP_PASSPHRASE}",
+    "s3": {
+      "endpoint": "https://s3.us-west-002.backblazeb2.com",
+      "bucket": "openclaw-backups",
+      "region": "us-west-002",
+      "accessKeyId": "${B2_KEY_ID}",
+      "secretAccessKey": "${B2_APP_KEY}"
+    }
+  }
+}
+```
 
 ## Development
 

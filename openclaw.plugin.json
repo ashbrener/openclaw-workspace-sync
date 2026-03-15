@@ -1,6 +1,10 @@
 {
   "id": "openclaw-workspace-sync",
   "uiHints": {
+    "sync": {
+      "label": "Sync Settings",
+      "help": "Nested sync config (preferred). Same fields as flat config: provider, mode, interval, etc."
+    },
     "provider": {
       "label": "Cloud Provider",
       "help": "Cloud storage provider for workspace sync"
@@ -123,12 +127,54 @@
       "label": "rclone Options",
       "help": "Key-value pairs passed directly to rclone config",
       "advanced": true
+    },
+    "backup.enabled": {
+      "label": "Enable Backups",
+      "help": "Encrypted snapshot backups to cloud storage"
+    },
+    "backup.provider": {
+      "label": "Backup Provider",
+      "help": "Cloud provider for backup storage (can differ from sync provider). Defaults to the sync provider."
+    },
+    "backup.bucket": {
+      "label": "Backup Bucket",
+      "help": "S3/R2 bucket name for backup snapshots"
+    },
+    "backup.prefix": {
+      "label": "Backup Prefix",
+      "placeholder": "habibi/",
+      "help": "Path prefix within the bucket for this agent's snapshots"
+    },
+    "backup.interval": {
+      "label": "Backup Interval (seconds)",
+      "placeholder": "86400",
+      "help": "How often to create backups (default: 86400 = daily)"
+    },
+    "backup.encrypt": {
+      "label": "Encrypt Backups",
+      "help": "Encrypt snapshots with AES-256 before upload"
+    },
+    "backup.passphrase": {
+      "label": "Encryption Passphrase",
+      "sensitive": true,
+      "help": "Passphrase for backup encryption. Use env var: ${BACKUP_PASSPHRASE}"
+    },
+    "backup.include": {
+      "label": "Backup Include",
+      "help": "What to include: workspace, config, cron, memory, sessions, credentials, skills, hooks, extensions, env, agents, pages, transcripts"
+    },
+    "backup.retain": {
+      "label": "Retention",
+      "help": "Number of snapshots to keep, or { daily: N, weekly: N, monthly: N }"
     }
   },
   "configSchema": {
     "type": "object",
-    "additionalProperties": false,
     "properties": {
+      "sync": {
+        "type": "object",
+        "description": "Nested sync config (preferred). Contains the same fields as the flat config: provider, mode, interval, remotePath, etc."
+      },
       "provider": {
         "type": "string",
         "enum": [
@@ -195,6 +241,81 @@
       },
       "copySymlinks": {
         "type": "boolean"
+      },
+      "backup": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": { "type": "boolean" },
+          "provider": {
+            "type": "string",
+            "enum": ["dropbox", "gdrive", "onedrive", "s3", "custom"]
+          },
+          "remoteName": { "type": "string" },
+          "configPath": { "type": "string" },
+          "remotePath": { "type": "string" },
+          "bucket": { "type": "string" },
+          "prefix": { "type": "string" },
+          "interval": { "type": "number", "minimum": 0 },
+          "encrypt": { "type": "boolean" },
+          "passphrase": { "type": "string" },
+          "include": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["workspace", "config", "cron", "memory", "sessions", "credentials", "skills", "hooks", "extensions", "env", "agents", "pages", "transcripts"]
+            }
+          },
+          "retain": {
+            "description": "Number of snapshots to keep, or {daily, weekly, monthly} object for tiered retention"
+          },
+          "exclude": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "s3": {
+            "type": "object",
+            "properties": {
+              "endpoint": { "type": "string" },
+              "bucket": { "type": "string" },
+              "region": { "type": "string" },
+              "accessKeyId": { "type": "string" },
+              "secretAccessKey": { "type": "string" }
+            }
+          },
+          "dropbox": {
+            "type": "object",
+            "properties": {
+              "appFolder": { "type": "boolean" },
+              "appKey": { "type": "string" },
+              "appSecret": { "type": "string" },
+              "token": { "type": "string" }
+            }
+          },
+          "gdrive": {
+            "type": "object",
+            "properties": {
+              "token": { "type": "string" },
+              "teamDrive": { "type": "string" },
+              "rootFolderId": { "type": "string" }
+            }
+          },
+          "onedrive": {
+            "type": "object",
+            "properties": {
+              "token": { "type": "string" },
+              "driveId": { "type": "string" },
+              "driveType": { "type": "string", "enum": ["personal", "business", "sharepoint"] }
+            }
+          },
+          "custom": {
+            "type": "object",
+            "properties": {
+              "rcloneType": { "type": "string" },
+              "rcloneOptions": { "type": "object", "additionalProperties": { "type": "string" } }
+            }
+          }
+        }
       },
       "s3": {
         "type": "object",

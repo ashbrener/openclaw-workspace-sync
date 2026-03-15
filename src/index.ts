@@ -29,11 +29,42 @@ import {
   generateRcloneConfig,
   type RcloneSyncResult,
 } from "./rclone.js";
-import type { WorkspaceSyncConfig, WorkspaceSyncProvider } from "./types.js";
-import { startSyncManager, stopSyncManager, getSyncManagerStatus } from "./sync-manager.js";
+import { homedir } from "node:os";
+import type { WorkspaceSyncConfig, WorkspaceSyncProvider, RawPluginConfig, NestedPluginConfig } from "./types.js";
 
+function isErr<T extends { ok: boolean }>(r: T): r is Extract<T, { ok: false }> {
+  return !r.ok;
+}
+import { startSyncManager, stopSyncManager, getSyncManagerStatus } from "./sync-manager.js";
+import {
+  runBackup,
+  runRestore,
+  listBackupSnapshots,
+  startBackupManager,
+  stopBackupManager,
+  getBackupManagerStatus,
+} from "./backup-manager.js";
+
+/**
+ * Detect nested `{ sync, backup }` vs flat config and normalize to
+ * the internal WorkspaceSyncConfig shape.
+ */
 function parsePluginConfig(raw: Record<string, unknown> | undefined): WorkspaceSyncConfig {
   if (!raw) return {};
+
+  const hasSync = "sync" in raw && typeof raw.sync === "object" && raw.sync !== null;
+  const hasBackupTop = "backup" in raw && typeof raw.backup === "object" && raw.backup !== null;
+  const hasSyncFields = "provider" in raw || "mode" in raw || "remotePath" in raw || "interval" in raw;
+
+  if (hasSync && !hasSyncFields) {
+    const nested = raw as unknown as NestedPluginConfig;
+    const syncPart = { ...(nested.sync ?? {}) } as WorkspaceSyncConfig;
+    if (hasBackupTop) {
+      syncPart.backup = nested.backup;
+    }
+    return syncPart;
+  }
+
   return raw as WorkspaceSyncConfig;
 }
 
@@ -244,6 +275,21 @@ const workspaceSyncPlugin = {
               console.log(`  Total syncs: ${mgrStatus.syncCount}`);
               console.log(`  Errors: ${mgrStatus.errorCount}`);
             }
+
+            const bkStatus = getBackupManagerStatus();
+            if (syncConfig.backup?.enabled) {
+              console.log("");
+              console.log("Backup:");
+              console.log(`  Running: ${bkStatus.running ? "yes" : "no"}`);
+              console.log(`  Encrypted: ${syncConfig.backup.encrypt ? "yes" : "no"}`);
+              console.log(`  Interval: ${syncConfig.backup.interval ?? 86400}s`);
+              if (bkStatus.lastBackupAt) {
+                console.log(`  Last backup: ${bkStatus.lastBackupAt.toISOString()}`);
+                console.log(`  Last backup OK: ${bkStatus.lastBackupOk}`);
+                console.log(`  Total backups: ${bkStatus.backupCount}`);
+                console.log(`  Errors: ${bkStatus.errorCount}`);
+              }
+            }
           });
 
         // openclaw workspace-sync setup — interactive wizard
@@ -386,7 +432,7 @@ const workspaceSyncPlugin = {
             clack.log.success("Authorization successful");
 
             // Save rclone config
-            const stateDir = process.env.OPENCLAW_STATE_DIR ?? `${process.env.HOME}/.openclaw`;
+            const stateDir = process.env.OPENCLAW_STATE_DIR ?? `${homedir()}/.openclaw`;
             const configPath = `${stateDir}/.config/rclone/rclone.conf`;
             const remoteName = "cloud";
 
@@ -461,7 +507,7 @@ const workspaceSyncPlugin = {
 
               console.log("Authorization successful");
 
-              const stateDir = process.env.OPENCLAW_STATE_DIR ?? `${process.env.HOME}/.openclaw`;
+              const stateDir = process.env.OPENCLAW_STATE_DIR ?? `${homedir()}/.openclaw`;
               const remoteName = syncConfig.remoteName || "cloud";
               const configPath =
                 syncConfig.configPath || `${stateDir}/.config/rclone/rclone.conf`;
@@ -523,6 +569,141 @@ const workspaceSyncPlugin = {
               console.log(`  ${file}`);
             }
             console.log(`\n${(result as any).files.length} files`);
+          });
+
+        // ================================================================
+        // Backup commands
+        // ================================================================
+
+        const backupCmd = workspace
+          .command("backup")
+          .description("Encrypted snapshot backups to cloud storage");
+
+        backupCmd
+          .command("now")
+          .description("Create a backup snapshot immediately")
+          .action(async () => {
+            const wsDir = workspaceDir ?? process.cwd();
+            const stateDir = process.env.OPENCLAW_STATE_DIR ?? `${homedir()}/.openclaw`;
+
+            if (!syncConfig.backup?.enabled) {
+              console.error("Backup not enabled. Add a backup block to your plugin config.");
+              process.exit(1);
+            }
+
+            console.log("Creating backup snapshot...");
+
+            const result = await runBackup({
+              syncConfig,
+              workspaceDir: wsDir,
+              stateDir,
+              logger: {
+                info: (msg) => console.log(msg),
+                warn: (msg) => console.warn(msg),
+                error: (msg) => console.error(msg),
+              },
+            });
+
+            if (result.ok) {
+              console.log(`Backup complete: ${result.snapshotName}`);
+              console.log(`Size: ${(result.sizeBytes / 1024 / 1024).toFixed(1)} MB`);
+              console.log(`Encrypted: ${result.encrypted ? "yes" : "no"}`);
+            } else if (isErr(result)) {
+              console.error(`Backup failed: ${result.error}`);
+              process.exit(1);
+            }
+          });
+
+        backupCmd
+          .command("list")
+          .description("List available backup snapshots")
+          .action(async () => {
+            const stateDir = process.env.OPENCLAW_STATE_DIR ?? `${homedir()}/.openclaw`;
+
+            const result = await listBackupSnapshots({
+              syncConfig,
+              stateDir,
+              logger: {
+                info: () => {},
+                warn: (msg) => console.warn(msg),
+                error: (msg) => console.error(msg),
+              },
+            });
+
+            if (isErr(result)) {
+              console.error(`Failed: ${result.error}`);
+              process.exit(1);
+            }
+
+            if (result.snapshots.length === 0) {
+              console.log("No snapshots found.");
+              return;
+            }
+
+            console.log(`${result.snapshots.length} snapshot(s):\n`);
+            for (const snap of result.snapshots) {
+              const encrypted = snap.endsWith(".enc") ? " (encrypted)" : "";
+              console.log(`  ${snap}${encrypted}`);
+            }
+          });
+
+        backupCmd
+          .command("restore")
+          .description("Restore from a backup snapshot")
+          .option("--snapshot <name>", "Snapshot name (default: latest)", "latest")
+          .option("--to <path>", "Restore destination directory")
+          .option("--dry-run", "Show what would be restored without restoring")
+          .action(async (opts: { snapshot: string; to?: string; dryRun?: boolean }) => {
+            const wsDir = workspaceDir ?? process.cwd();
+            const stateDir = process.env.OPENCLAW_STATE_DIR ?? `${homedir()}/.openclaw`;
+            const restoreTo = opts.to ?? `${stateDir}/.backup-restore`;
+
+            if (opts.dryRun) {
+              console.log(`Would restore snapshot: ${opts.snapshot}`);
+              console.log(`Destination: ${restoreTo}`);
+              console.log("(dry-run — no files changed)");
+              return;
+            }
+
+            console.log(`Restoring snapshot: ${opts.snapshot}`);
+            console.log(`Destination: ${restoreTo}`);
+
+            const result = await runRestore({
+              syncConfig,
+              workspaceDir: wsDir,
+              stateDir,
+              snapshotName: opts.snapshot,
+              restoreTo,
+              logger: {
+                info: (msg) => console.log(msg),
+                warn: (msg) => console.warn(msg),
+                error: (msg) => console.error(msg),
+              },
+            });
+
+            if (result.ok) {
+              console.log(`\nRestore complete: ${result.snapshotName}`);
+              console.log(`Files extracted to: ${result.restoredTo}`);
+            } else if (isErr(result)) {
+              console.error(`Restore failed: ${result.error}`);
+              process.exit(1);
+            }
+          });
+
+        backupCmd
+          .command("status")
+          .description("Show backup service status")
+          .action(() => {
+            const status = getBackupManagerStatus();
+            console.log("Backup Service Status");
+            console.log("");
+            console.log(`  Running: ${status.running ? "yes" : "no"}`);
+            console.log(`  Backups: ${status.backupCount}`);
+            console.log(`  Errors: ${status.errorCount}`);
+            if (status.lastBackupAt) {
+              console.log(`  Last backup: ${status.lastBackupAt.toISOString()}`);
+              console.log(`  Last backup OK: ${status.lastBackupOk}`);
+            }
           });
       },
       { commands: ["workspace-sync"] },
@@ -684,9 +865,14 @@ const workspaceSyncPlugin = {
         }
 
         startSyncManager(syncConfig, wsDir, ctx.stateDir, ctx.logger, { onInboxFiles });
+
+        if (syncConfig.backup?.enabled) {
+          startBackupManager(syncConfig, wsDir, ctx.stateDir, ctx.logger);
+        }
       },
       stop: () => {
         stopSyncManager();
+        stopBackupManager();
         api.logger.info("[workspace-sync] service stopped");
       },
     });

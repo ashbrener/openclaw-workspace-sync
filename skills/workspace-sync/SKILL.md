@@ -80,7 +80,7 @@ Lists files in the configured cloud storage path.
 
 ## Configuration
 
-Workspace sync is configured via the plugin entry in `openclaw.json`:
+Workspace sync is configured via the plugin entry in `openclaw.json`. The preferred format uses nested `sync` and `backup` blocks (flat config at root level is also supported):
 
 ```json
 {
@@ -89,15 +89,17 @@ Workspace sync is configured via the plugin entry in `openclaw.json`:
       "openclaw-workspace-sync": {
         "enabled": true,
         "config": {
-          "provider": "dropbox",
-          "mode": "mailbox",
-          "remotePath": "",
-          "localPath": "/",
-          "interval": 60,
-          "timeout": 1800,
-          "onSessionStart": true,
-          "onSessionEnd": true,
-          "exclude": [".git/**", "node_modules/**", "*.log"]
+          "sync": {
+            "provider": "dropbox",
+            "mode": "mailbox",
+            "remotePath": "",
+            "localPath": "/",
+            "interval": 60,
+            "timeout": 1800,
+            "onSessionStart": true,
+            "onSessionEnd": true,
+            "exclude": [".git/**", "node_modules/**", "*.log"]
+          }
         }
       }
     }
@@ -106,6 +108,8 @@ Workspace sync is configured via the plugin entry in `openclaw.json`:
 ```
 
 ### Config keys
+
+These keys live under `sync` in the nested format, or at the config root in flat format.
 
 | Key | Default | Description |
 |-----|---------|-------------|
@@ -179,3 +183,46 @@ rclone ls cloud:openclaw-share
 - Only `**/.DS_Store` excluded by default — add your own excludes in config
 - Sync operations run in background (no LLM tokens used)
 - All rclone activity is logged at info level for visibility
+
+## Encrypted backups
+
+Add a `backup` block to the plugin config for automated encrypted snapshots to your own cloud storage (S3, R2, B2, etc.). Backups stream directly (`tar | rclone rcat`) — no local temp files, so they work even when disk space is tight.
+
+### Backup commands
+
+```bash
+openclaw workspace-sync backup now        # Create a snapshot immediately
+openclaw workspace-sync backup list       # List available snapshots
+openclaw workspace-sync backup restore    # Restore latest snapshot
+openclaw workspace-sync backup status     # Check backup service status
+```
+
+### Backup config
+
+```json
+{
+  "backup": {
+    "enabled": true,
+    "provider": "s3",
+    "bucket": "my-backups",
+    "prefix": "agent-name/",
+    "interval": 86400,
+    "encrypt": true,
+    "passphrase": "${BACKUP_PASSPHRASE}",
+    "include": ["workspace", "config", "cron", "memory"],
+    "retain": { "daily": 7, "weekly": 4 }
+  }
+}
+```
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `enabled` | `false` | Enable scheduled backups |
+| `provider` | parent provider | Cloud provider (can differ from sync provider) |
+| `bucket` | — | S3/R2 bucket name |
+| `prefix` | `""` | Path prefix within the bucket |
+| `interval` | `86400` | Backup interval in seconds (clamped to min 300) |
+| `encrypt` | `false` | AES-256 client-side encryption |
+| `passphrase` | — | Encryption passphrase (use env var) |
+| `include` | `["workspace", "config", "cron", "memory"]` | What to back up |
+| `retain` | `7` | Keep N snapshots, or `{ daily: N, weekly: N }` |
