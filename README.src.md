@@ -626,7 +626,7 @@ Back up your entire agent system — workspace, config, cron jobs, memory, sessi
 ### How it works
 
 ```mermaid
-flowchart LR
+flowchart TD
     subgraph GW["Gateway"]
         WS["/workspace"]
         CFG["config / cron / memory"]
