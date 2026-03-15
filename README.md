@@ -1,8 +1,8 @@
-# OpenClaw Workspace Cloud Sync Plugin
+# OpenClaw Workspace Sync & Backup Plugin
 
-Sync your OpenClaw agent workspace with cloud storage via [rclone](https://rclone.org/).
+Sync and back up your OpenClaw agent workspace to cloud storage via [rclone](https://rclone.org/).
 
-Supports **Dropbox, Google Drive, OneDrive, S3/R2/Minio**, and [70+ cloud providers](https://rclone.org/overview/).
+**Sync** your workspace to Dropbox, Google Drive, OneDrive, S3, or [70+ providers](https://rclone.org/overview/) with mailbox, mirror, or bisync modes. **Back up** your entire agent system — workspace, config, sessions, memory — as encrypted snapshots to S3, R2, B2, or any rclone backend.
 
 ## How it works
 

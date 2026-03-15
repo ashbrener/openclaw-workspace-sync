@@ -18,6 +18,9 @@ jobs:
         with:
           node-version: 22
 
+      - name: Install system dependencies for Puppeteer
+        run: npx puppeteer browsers install chrome --install-deps
+
       - name: Install dependencies
         run: npm install
 
