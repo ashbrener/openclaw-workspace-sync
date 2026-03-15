@@ -29,6 +29,7 @@ import {
   generateRcloneConfig,
   type RcloneSyncResult,
 } from "./rclone.js";
+import { homedir } from "node:os";
 import type { WorkspaceSyncConfig, WorkspaceSyncProvider, RawPluginConfig, NestedPluginConfig } from "./types.js";
 
 function isErr<T extends { ok: boolean }>(r: T): r is Extract<T, { ok: false }> {
@@ -57,7 +58,7 @@ function parsePluginConfig(raw: Record<string, unknown> | undefined): WorkspaceS
 
   if (hasSync && !hasSyncFields) {
     const nested = raw as unknown as NestedPluginConfig;
-    const syncPart = (nested.sync ?? {}) as WorkspaceSyncConfig;
+    const syncPart = { ...(nested.sync ?? {}) } as WorkspaceSyncConfig;
     if (hasBackupTop) {
       syncPart.backup = nested.backup;
     }
@@ -431,7 +432,7 @@ const workspaceSyncPlugin = {
             clack.log.success("Authorization successful");
 
             // Save rclone config
-            const stateDir = process.env.OPENCLAW_STATE_DIR ?? `${process.env.HOME}/.openclaw`;
+            const stateDir = process.env.OPENCLAW_STATE_DIR ?? `${homedir()}/.openclaw`;
             const configPath = `${stateDir}/.config/rclone/rclone.conf`;
             const remoteName = "cloud";
 
@@ -506,7 +507,7 @@ const workspaceSyncPlugin = {
 
               console.log("Authorization successful");
 
-              const stateDir = process.env.OPENCLAW_STATE_DIR ?? `${process.env.HOME}/.openclaw`;
+              const stateDir = process.env.OPENCLAW_STATE_DIR ?? `${homedir()}/.openclaw`;
               const remoteName = syncConfig.remoteName || "cloud";
               const configPath =
                 syncConfig.configPath || `${stateDir}/.config/rclone/rclone.conf`;
@@ -583,7 +584,7 @@ const workspaceSyncPlugin = {
           .description("Create a backup snapshot immediately")
           .action(async () => {
             const wsDir = workspaceDir ?? process.cwd();
-            const stateDir = process.env.OPENCLAW_STATE_DIR ?? `${process.env.HOME}/.openclaw`;
+            const stateDir = process.env.OPENCLAW_STATE_DIR ?? `${homedir()}/.openclaw`;
 
             if (!syncConfig.backup?.enabled) {
               console.error("Backup not enabled. Add a backup block to your plugin config.");
@@ -617,7 +618,7 @@ const workspaceSyncPlugin = {
           .command("list")
           .description("List available backup snapshots")
           .action(async () => {
-            const stateDir = process.env.OPENCLAW_STATE_DIR ?? `${process.env.HOME}/.openclaw`;
+            const stateDir = process.env.OPENCLAW_STATE_DIR ?? `${homedir()}/.openclaw`;
 
             const result = await listBackupSnapshots({
               syncConfig,
@@ -654,7 +655,7 @@ const workspaceSyncPlugin = {
           .option("--dry-run", "Show what would be restored without restoring")
           .action(async (opts: { snapshot: string; to?: string; dryRun?: boolean }) => {
             const wsDir = workspaceDir ?? process.cwd();
-            const stateDir = process.env.OPENCLAW_STATE_DIR ?? `${process.env.HOME}/.openclaw`;
+            const stateDir = process.env.OPENCLAW_STATE_DIR ?? `${homedir()}/.openclaw`;
             const restoreTo = opts.to ?? `${stateDir}/.backup-restore`;
 
             if (opts.dryRun) {

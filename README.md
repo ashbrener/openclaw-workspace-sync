@@ -585,7 +585,7 @@ Back up your entire agent system — workspace, config, cron jobs, memory, sessi
 ### How it works
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/ashbrener/openclaw-workspace-sync/main/docs/diagrams/mode-3.svg" alt="sync mode diagram" width="700" />
+  <img src="https://raw.githubusercontent.com/ashbrener/openclaw-workspace-sync/main/docs/diagrams/mode-3.svg" alt="backup pipeline diagram" width="700" />
 </p>
 
 1. **Streams directly** — `tar | [openssl enc] | rclone rcat` piped straight to the remote. Zero local temp files, zero extra disk needed. A 10 GB workspace on a 1 GB free volume? No problem.

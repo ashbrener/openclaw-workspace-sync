@@ -59,7 +59,8 @@ for (const match of readme.matchAll(mermaidBlock)) {
   try { unlinkSync(tmpInput); } catch {}
 
   const rawUrl = `https://raw.githubusercontent.com/ashbrener/openclaw-workspace-sync/main/docs/diagrams/${svgName}`;
-  const imgTag = `<p align="center">\n  <img src="${rawUrl}" alt="sync mode diagram" width="700" />\n</p>`;
+  const altText = index <= 2 ? "sync mode diagram" : "backup pipeline diagram";
+  const imgTag = `<p align="center">\n  <img src="${rawUrl}" alt="${altText}" width="700" />\n</p>`;
   output = output.replace(match[0], imgTag);
   index++;
 }

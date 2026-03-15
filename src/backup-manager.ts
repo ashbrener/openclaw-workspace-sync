@@ -51,7 +51,7 @@ function resolveIncludePaths(
     env: join(workspaceDir, ".env"),
     agents: join(stateDir, "agents"),
     pages: join(workspaceDir, "pages"),
-    transcripts: join(stateDir, "agents"),
+    transcripts: join(stateDir, "sessions"),
   };
 
   return include.map((item) => {
@@ -100,6 +100,7 @@ async function streamBackup(params: {
   return new Promise((resolve) => {
     const tar = spawn("tar", tarArgs, { stdio: ["ignore", "pipe", "pipe"] });
     let lastStdout = tar.stdout;
+    let encExitCode: number | null = null;
 
     if (encrypt && passphrase) {
       const enc = spawn("openssl", [
@@ -115,6 +116,10 @@ async function streamBackup(params: {
         const msg = chunk.toString().trim();
         if (msg) logger.warn(`[backup] openssl: ${msg}`);
       });
+      enc.on("error", (err) => {
+        resolve({ ok: false, error: `openssl spawn failed: ${err.message}` });
+      });
+      enc.on("close", (code) => { encExitCode = code; });
       lastStdout = enc.stdout;
     }
 
@@ -130,16 +135,20 @@ async function streamBackup(params: {
     });
 
     let tarErr = "";
+    let tarExitCode: number | null = null;
     tar.stderr.on("data", (chunk: Buffer) => { tarErr += chunk.toString(); });
+    tar.on("close", (code) => { tarExitCode = code; });
 
     let rcatErr = "";
     rcat.stderr.on("data", (chunk: Buffer) => { rcatErr += chunk.toString(); });
 
     rcat.on("close", (code) => {
-      if (code !== 0) {
+      if (tarExitCode !== 0 && tarExitCode !== null) {
+        resolve({ ok: false, error: `tar failed (exit ${tarExitCode}): ${tarErr}` });
+      } else if (encExitCode !== 0 && encExitCode !== null) {
+        resolve({ ok: false, error: `openssl enc failed (exit ${encExitCode})` });
+      } else if (code !== 0) {
         resolve({ ok: false, error: `rclone rcat failed (exit ${code}): ${rcatErr}` });
-      } else if (tarErr && !tarErr.includes("Removing leading")) {
-        resolve({ ok: false, error: `tar warnings: ${tarErr}` });
       } else {
         resolve({ ok: true, sizeBytes });
       }
@@ -250,6 +259,8 @@ async function deleteRemoteFile(
     execFile(binary, ["deletefile", remote, "--config", configPath], { timeout: 30_000 }, (err, _stdout, stderr) => {
       if (err) {
         logger.warn(`[backup] Failed to delete ${fileName}: ${stderr || err.message}`);
+      } else {
+        logger.info(`[backup] Deleted: ${fileName}`);
       }
       resolve();
     });
@@ -348,8 +359,8 @@ export async function runBackup(params: {
   }
 
   const include: BackupIncludeItem[] = backup.include ?? ["workspace", "config", "cron", "memory"];
-  const excludePatterns = (backup.exclude ?? syncConfig.exclude ?? ["**/.git/**", "**/node_modules/**"])
-    .map((p) => p.replace(/^\*\*\//, "*/").replace(/\/\*\*$/, "/*"));
+  const excludePatterns = (backup.exclude ?? syncConfig.exclude ?? [".git", "node_modules", "__pycache__", ".venv", "venv"])
+    .map((p) => p.replace(/^\*\*\//, "").replace(/\/\*\*$/, ""));
   const doEncrypt = backup.encrypt ?? false;
   const passphrase = backup.passphrase;
 
@@ -374,7 +385,17 @@ export async function runBackup(params: {
 
   logger.info(`[backup] Starting backup: ${existing.map((p) => p.item).join(", ")}`);
 
-  const timestamp = new Date().toISOString().replace(/[-:.]/g, "").replace("T", "T").slice(0, 16) + "Z";
+  const now = new Date();
+  const timestamp = [
+    now.getUTCFullYear(),
+    String(now.getUTCMonth() + 1).padStart(2, "0"),
+    String(now.getUTCDate()).padStart(2, "0"),
+    "T",
+    String(now.getUTCHours()).padStart(2, "0"),
+    String(now.getUTCMinutes()).padStart(2, "0"),
+    String(now.getUTCSeconds()).padStart(2, "0"),
+    "Z",
+  ].join("");
   const ext = doEncrypt ? ".tar.gz.enc" : ".tar.gz";
   const snapshotName = `backup-${timestamp}${ext}`;
 
@@ -429,7 +450,6 @@ async function pruneSnapshots(
 
   for (const file of toDelete) {
     await deleteRemoteFile(configPath, remoteName, remotePath, file, logger);
-    logger.info(`[backup] Deleted: ${file}`);
   }
 }
 
@@ -528,6 +548,7 @@ export async function runRestore(params: {
           if (msg) logger.warn(`[backup] openssl: ${msg}`);
         });
         lastStdout = dec.stdout;
+        dec.on("error", (err) => reject(new Error(`openssl spawn failed: ${err.message}`)));
       }
 
       const tar = spawn("tar", ["xz", "--no-same-owner", "-C", restoreDir], { stdio: ["pipe", "ignore", "pipe"] });
@@ -589,7 +610,7 @@ let bkLogger: Logger | null = null;
 
 function scheduleNextBackup(): void {
   if (!backupState.running || !bkSyncConfig?.backup) return;
-  const intervalMs = (bkSyncConfig.backup.interval ?? 86400) * 1000;
+  const intervalMs = Math.max(bkSyncConfig.backup.interval ?? 86400, 300) * 1000;
   if (intervalMs <= 0) return;
 
   backupState.timeoutId = setTimeout(() => {
@@ -651,7 +672,6 @@ export function startBackupManager(
   }
 
   const effectiveInterval = Math.max(intervalSeconds, 300);
-  backup.interval = effectiveInterval;
   backupState.running = true;
 
   logger.info(`[backup] Backup service started — every ${effectiveInterval}s`);

@@ -44,7 +44,7 @@ export type BackupRetain = number | {
 export type BackupConfig = {
   enabled?: boolean;
   /** Cloud provider for backup storage (can differ from sync provider). Defaults to the parent sync provider. */
-  provider?: WorkspaceSyncProvider;
+  provider?: Exclude<WorkspaceSyncProvider, "off">;
   /** rclone remote name for backup (separate from sync remote). Default: "backup". */
   remoteName?: string;
   /** Path to rclone config file for backup remote. */
