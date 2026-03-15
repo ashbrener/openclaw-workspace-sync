@@ -18,11 +18,13 @@ jobs:
         with:
           node-version: 22
 
-      - name: Install system dependencies for Puppeteer
-        run: npx puppeteer browsers install chrome --install-deps
-
       - name: Install dependencies
         run: npm install
+
+      - name: Install Chromium system deps
+        run: |
+          cd node_modules/puppeteer
+          sudo npx @puppeteer/browsers install chrome --install-deps
 
       - name: Render mermaid diagrams
         run: node scripts/render-mermaid.js
