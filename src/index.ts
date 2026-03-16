@@ -717,7 +717,12 @@ const workspaceSyncPlugin = {
       api.on("session_start", async (_event, ctx) => {
         if (!syncConfig.provider || syncConfig.provider === "off") return;
 
-        api.logger.info("[workspace-sync] triggered on session start");
+        if (!syncConfig.mode) {
+          api.logger.warn("[workspace-sync] mode not set, skipping session start sync");
+          return;
+        }
+
+        api.logger.info(`[workspace-sync] triggered on session start (mode: ${syncConfig.mode})`);
 
         try {
           const installed = await isRcloneInstalled();
@@ -741,21 +746,44 @@ const workspaceSyncPlugin = {
             return;
           }
 
-          api.logger.info(
-            `[workspace-sync] syncing ${resolved.remoteName}:${resolved.remotePath} <-> ${resolved.localPath}`,
-          );
+          let result: RcloneSyncResult;
 
-          const result = await runBisync({
-            configPath: resolved.configPath,
-            remoteName: resolved.remoteName,
-            remotePath: resolved.remotePath,
-            localPath: resolved.localPath,
-            conflictResolve: resolved.conflictResolve,
-            exclude: resolved.exclude,
-            copySymlinks: resolved.copySymlinks,
-            timeoutMs: resolved.timeoutMs,
-            verbose: !!api.logger.debug,
-          });
+          if (resolved.mode === "mailbox") {
+            const mailboxExcludes = [...resolved.exclude, "_inbox/**", "_outbox/**"];
+            result = await runSync({
+              configPath: resolved.configPath,
+              remoteName: resolved.remoteName,
+              remotePath: resolved.remotePath,
+              localPath: resolved.localPath,
+              direction: "push",
+              exclude: mailboxExcludes,
+              timeoutMs: resolved.timeoutMs,
+              verbose: !!api.logger.debug,
+            });
+          } else if (resolved.mode === "mirror") {
+            result = await runSync({
+              configPath: resolved.configPath,
+              remoteName: resolved.remoteName,
+              remotePath: resolved.remotePath,
+              localPath: resolved.localPath,
+              direction: "pull",
+              exclude: resolved.exclude,
+              timeoutMs: resolved.timeoutMs,
+              verbose: !!api.logger.debug,
+            });
+          } else {
+            result = await runBisync({
+              configPath: resolved.configPath,
+              remoteName: resolved.remoteName,
+              remotePath: resolved.remotePath,
+              localPath: resolved.localPath,
+              conflictResolve: resolved.conflictResolve,
+              exclude: resolved.exclude,
+              copySymlinks: resolved.copySymlinks,
+              timeoutMs: resolved.timeoutMs,
+              verbose: !!api.logger.debug,
+            });
+          }
 
           if (result.ok) {
             api.logger.info("[workspace-sync] session start sync completed");
@@ -778,7 +806,12 @@ const workspaceSyncPlugin = {
       api.on("session_end", async (_event, ctx) => {
         if (!syncConfig.provider || syncConfig.provider === "off") return;
 
-        api.logger.info("[workspace-sync] triggered on session end");
+        if (!syncConfig.mode) {
+          api.logger.warn("[workspace-sync] mode not set, skipping session end sync");
+          return;
+        }
+
+        api.logger.info(`[workspace-sync] triggered on session end (mode: ${syncConfig.mode})`);
 
         try {
           const installed = await isRcloneInstalled();
@@ -794,17 +827,44 @@ const workspaceSyncPlugin = {
 
           if (!isRcloneConfigured(resolved.configPath, resolved.remoteName)) return;
 
-          const result = await runBisync({
-            configPath: resolved.configPath,
-            remoteName: resolved.remoteName,
-            remotePath: resolved.remotePath,
-            localPath: resolved.localPath,
-            conflictResolve: resolved.conflictResolve,
-            exclude: resolved.exclude,
-            copySymlinks: resolved.copySymlinks,
-            timeoutMs: resolved.timeoutMs,
-            verbose: !!api.logger.debug,
-          });
+          let result: RcloneSyncResult;
+
+          if (resolved.mode === "mailbox") {
+            const mailboxExcludes = [...resolved.exclude, "_inbox/**", "_outbox/**"];
+            result = await runSync({
+              configPath: resolved.configPath,
+              remoteName: resolved.remoteName,
+              remotePath: resolved.remotePath,
+              localPath: resolved.localPath,
+              direction: "push",
+              exclude: mailboxExcludes,
+              timeoutMs: resolved.timeoutMs,
+              verbose: !!api.logger.debug,
+            });
+          } else if (resolved.mode === "mirror") {
+            result = await runSync({
+              configPath: resolved.configPath,
+              remoteName: resolved.remoteName,
+              remotePath: resolved.remotePath,
+              localPath: resolved.localPath,
+              direction: "pull",
+              exclude: resolved.exclude,
+              timeoutMs: resolved.timeoutMs,
+              verbose: !!api.logger.debug,
+            });
+          } else {
+            result = await runBisync({
+              configPath: resolved.configPath,
+              remoteName: resolved.remoteName,
+              remotePath: resolved.remotePath,
+              localPath: resolved.localPath,
+              conflictResolve: resolved.conflictResolve,
+              exclude: resolved.exclude,
+              copySymlinks: resolved.copySymlinks,
+              timeoutMs: resolved.timeoutMs,
+              verbose: !!api.logger.debug,
+            });
+          }
 
           if (result.ok) {
             api.logger.info("[workspace-sync] session end sync completed");
