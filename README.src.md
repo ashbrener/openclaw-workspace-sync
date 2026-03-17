@@ -60,7 +60,6 @@ Add to your `openclaw.json`. The `sync` and `backup` blocks are independent — 
             "provider": "dropbox",
             "mode": "mailbox",
             "remotePath": "",
-            "localPath": "/",
             "interval": 180,
             "onSessionStart": true,
             "exclude": [".git/**", "node_modules/**", "*.log"]
@@ -166,7 +165,6 @@ This wakes the agent on its next heartbeat. The agent sees the message and can p
   "mode": "mailbox",
   "provider": "dropbox",
   "remotePath": "",
-  "localPath": "/",
   "interval": 180,
   "notifyOnInbox": true
 }
@@ -251,7 +249,7 @@ If you are running on a container platform, `mailbox` mode is strongly recommend
 | `ingestPath` | string | `"inbox"` | Local subfolder name for ingestion (relative to `localPath`) |
 | `notifyOnInbox` | boolean | `false` | Wake the agent when files arrive in `_inbox` (mailbox mode). Off by default — enabling this costs LLM credits per notification. |
 | `remotePath` | string | `"openclaw-share"` | Folder name in cloud storage |
-| `localPath` | string | `"shared"` | Subfolder within workspace to sync |
+| `localPath` | string | `""` (workspace root) | Relative subfolder within the workspace to sync. Defaults to the workspace root (e.g. `/data/workspace`). Must be a relative path — absolute paths like `"/"` are rejected. Set to a subfolder name like `"shared"` to sync only that directory. |
 | `interval` | number | `0` | Background sync interval in seconds (0 = manual only, min 60) |
 | `timeout` | number | `1800` | Max seconds for a single rclone sync operation (min 60) |
 | `onSessionStart` | boolean | `false` | Sync when an agent session begins |
@@ -380,6 +378,7 @@ Cloud sync involves two copies of your data. When things go wrong, one side can 
 **Bisync requires both sides to agree.** Bisync tracks what changed since the last sync. If that tracking state is lost (deploy, disk wipe, moving to a new machine), rclone does not know what changed and requires a `--resync`. A resync copies everything from both sides — if one side has stale or unwanted files, they propagate to the other.
 
 **Common pitfalls to avoid:**
+- Setting `localPath` to an absolute path like `"/"` — this syncs your entire filesystem, not your workspace. The plugin now rejects absolute paths with a clear error. Use `""` for the workspace root or a relative subfolder like `"shared"`.
 - Changing `remotePath` or `localPath` while periodic sync is enabled
 - Running `--resync` without checking both sides first
 - Using `bisync` on container platforms where state is ephemeral

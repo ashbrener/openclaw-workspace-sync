@@ -131,7 +131,7 @@ function runExecStreaming(
 // ============================================================================
 
 const DEFAULT_REMOTE_NAME = "cloud";
-const DEFAULT_LOCAL_PATH = "shared";
+const DEFAULT_LOCAL_PATH = "";
 const DEFAULT_REMOTE_PATH = "openclaw-share";
 const DEFAULT_CONFLICT_RESOLVE = "newer";
 const DEFAULT_EXCLUDES = [
