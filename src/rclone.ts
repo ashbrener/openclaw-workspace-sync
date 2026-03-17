@@ -7,7 +7,7 @@
 
 import { execFile, spawn } from "node:child_process";
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, unlinkSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, isAbsolute, join } from "node:path";
 import { homedir, platform } from "node:os";
 import type { WorkspaceSyncConfig, WorkspaceSyncMode, WorkspaceSyncProvider } from "./types.js";
 
@@ -286,6 +286,15 @@ export function resolveSyncConfig(
   onSessionEnd: boolean;
 } {
   const DEFAULT_TIMEOUT_S = 1800;
+
+  let localSub = config?.localPath ?? DEFAULT_LOCAL_PATH;
+  if (isAbsolute(localSub)) {
+    throw new Error(
+      `[workspace-sync] localPath must be relative to the workspace, got absolute path: "${localSub}". ` +
+        `Remove localPath or set it to a relative subfolder (e.g. "shared").`,
+    );
+  }
+
   return {
     provider: config?.provider ?? "off",
     mode: config?.mode ?? "mirror",
@@ -293,7 +302,7 @@ export function resolveSyncConfig(
     ingestPath: config?.ingestPath ?? "inbox",
     remoteName: config?.remoteName ?? DEFAULT_REMOTE_NAME,
     remotePath: config?.remotePath ?? DEFAULT_REMOTE_PATH,
-    localPath: join(workspace, config?.localPath ?? DEFAULT_LOCAL_PATH),
+    localPath: join(workspace, localSub),
     configPath: config?.configPath ?? getDefaultRcloneConfigPath(stateDir),
     conflictResolve: config?.conflictResolve ?? DEFAULT_CONFLICT_RESOLVE,
     exclude: config?.exclude ?? DEFAULT_EXCLUDES,
