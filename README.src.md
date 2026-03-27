@@ -154,11 +154,13 @@ Because the push explicitly excludes `_inbox/**` and `_outbox/**`, there is no r
 
 By default, mailbox mode is silent — files land in `_inbox` without waking the agent. This keeps costs at zero.
 
-If you want the agent to react when files arrive, set `"notifyOnInbox": true`. After each drain that moves files, the plugin injects a system event like:
+If you want the agent to react when files arrive, set `"notifyOnInbox": true`. After each drain that moves files, the plugin sends a rich notification to the agent including:
 
-> `[workspace-sync] New files in _inbox: report.pdf, data.csv`
+- A bullet-point list of new files (up to 10, with overflow count)
+- Available workspace directories so the agent can suggest where to put them
+- A prompt asking where to move the files
 
-This wakes the agent on its next heartbeat. The agent sees the message and can process the files — for example, reading, summarizing, or filing them.
+The agent picks this up on whichever channel it's running (Telegram, Discord, etc.) and can ask the user where to file the incoming items.
 
 **This costs credits.** Each notification triggers an agent turn. Only enable it if you want the agent to actively respond to incoming files.
 
@@ -171,6 +173,29 @@ This wakes the agent on its next heartbeat. The agent sees the message and can p
   "notifyOnInbox": true
 }
 ```
+
+##### `workspace_inbox` agent tool
+
+When `mode` is `"mailbox"`, the plugin automatically registers a **`workspace_inbox`** tool that the LLM agent can call. This lets the agent interactively manage inbox files on behalf of the user — no shell commands needed.
+
+| Action | What it does |
+|--------|-------------|
+| `list` | Show all files in `_inbox` (with sizes) and workspace directories (up to 3 levels deep) |
+| `peek` | Inspect a specific inbox file or directory — returns metadata (name, size, modified date) |
+| `move` | Move files from `_inbox` to a target workspace directory. Creates the directory if it doesn't exist. Supports moving specific files or all at once. |
+
+**End-to-end flow:**
+
+1. Someone drops a file in the Dropbox `_outbox` folder (or any cloud provider's outbox)
+2. Next mailbox drain pulls it into the workspace `_inbox`
+3. If `notifyOnInbox` is enabled, the agent wakes up and tells you on Telegram: *"New files arrived in _inbox: report.pdf. Workspace directories: CODE, docs. Where should I put them?"*
+4. You reply: *"move them to CODE/myproject"*
+5. The agent calls `workspace_inbox` with `action: "move", target: "CODE/myproject"`
+6. Files are moved, agent confirms
+
+The tool enforces path safety — it rejects absolute paths and traversal attempts (`../`). Target directories are always resolved relative to the workspace root.
+
+> **Note:** The `workspace_inbox` tool is always available in mailbox mode, even without `notifyOnInbox`. You can ask the agent to check the inbox or move files manually at any time.
 
 #### `mirror` mode
 
