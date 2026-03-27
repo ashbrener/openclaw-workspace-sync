@@ -30,12 +30,14 @@ import {
   type RcloneSyncResult,
 } from "./rclone.js";
 import { homedir } from "node:os";
+import { readdirSync } from "node:fs";
 import type { WorkspaceSyncConfig, WorkspaceSyncProvider, RawPluginConfig, NestedPluginConfig } from "./types.js";
 
 function isErr<T extends { ok: boolean }>(r: T): r is Extract<T, { ok: false }> {
   return !r.ok;
 }
 import { startSyncManager, stopSyncManager, getSyncManagerStatus, isSyncing, triggerImmediateSync } from "./sync-manager.js";
+import { createInboxTool } from "./inbox-tool.js";
 import {
   runBackup,
   runRestore,
@@ -710,6 +712,17 @@ const workspaceSyncPlugin = {
     );
 
     // ========================================================================
+    // Agent Tool — inbox file management
+    // ========================================================================
+
+    if (syncConfig.mode === "mailbox") {
+      api.registerTool((ctx) => {
+        const wsDir = ctx.workspaceDir ?? api.resolvePath("workspace");
+        return createInboxTool(wsDir);
+      });
+    }
+
+    // ========================================================================
     // Session Hooks
     // ========================================================================
 
@@ -782,10 +795,24 @@ const workspaceSyncPlugin = {
         let onInboxFiles: ((files: string[]) => void) | undefined;
         if (syncConfig.notifyOnInbox) {
           onInboxFiles = (files) => {
-            const listing = files.length <= 5
-              ? files.join(", ")
-              : `${files.slice(0, 5).join(", ")} and ${files.length - 5} more`;
-            const text = `[workspace-sync] New files in _inbox: ${listing}`;
+            const listing = files.length <= 10
+              ? files.map((f) => `  • ${f}`).join("\n")
+              : files.slice(0, 10).map((f) => `  • ${f}`).join("\n") + `\n  … and ${files.length - 10} more`;
+
+            let dirListing = "";
+            try {
+              const dirs = readdirSync(wsDir, { withFileTypes: true })
+                .filter((d) => d.isDirectory() && !d.name.startsWith(".") && d.name !== "_inbox" && d.name !== "_outbox" && d.name !== "node_modules")
+                .map((d) => d.name)
+                .sort();
+              if (dirs.length > 0) {
+                dirListing = "\n\nWorkspace directories:\n" + dirs.map((d) => `  📁 ${d}`).join("\n");
+              }
+            } catch {
+              // best-effort
+            }
+
+            const text = `📥 New files arrived in _inbox:\n${listing}${dirListing}\n\nTo move them, tell me which directory (e.g. "move inbox files to CODE/myproject").`;
 
             const cfg = api.config as Record<string, any>;
             const agents = cfg?.agents?.list ?? [];
@@ -797,7 +824,7 @@ const workspaceSyncPlugin = {
               ? "global"
               : `agent:${defaultAgentId}:${mainKey}`;
 
-            api.logger.info(`${text} (notifying session ${sessionKey})`);
+            api.logger.info(`[workspace-sync] Inbox notification → session ${sessionKey}: ${files.length} file(s)`);
 
             try {
               api.runtime.system.enqueueSystemEvent(text, { sessionKey });
