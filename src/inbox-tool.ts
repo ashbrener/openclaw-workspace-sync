@@ -1,5 +1,5 @@
-import { join, resolve, relative, isAbsolute } from "node:path";
-import { existsSync, readdirSync, renameSync, mkdirSync, statSync, cpSync, rmSync } from "node:fs";
+import { join, resolve, relative, isAbsolute, sep } from "node:path";
+import { existsSync, readdirSync, renameSync, mkdirSync, lstatSync, cpSync, rmSync } from "node:fs";
 
 export const INBOX_TOOL_NAME = "workspace_inbox";
 
@@ -40,6 +40,20 @@ function jsonResult(payload: unknown) {
   };
 }
 
+/** Reject names containing path separators or traversal segments. */
+function isSafeBasename(name: string): boolean {
+  if (!name || name === "." || name === "..") return false;
+  if (name.includes("/") || name.includes("\\")) return false;
+  if (name.includes("\0")) return false;
+  return true;
+}
+
+/** Verify resolved path is strictly inside container dir. */
+function isInsideDir(container: string, candidate: string): boolean {
+  const rel = relative(container, candidate);
+  return !rel.startsWith("..") && !isAbsolute(rel);
+}
+
 function listDirsRecursive(base: string, prefix: string, depth: number, maxDepth: number): string[] {
   if (depth >= maxDepth) return [];
   try {
@@ -58,8 +72,9 @@ function listDirsRecursive(base: string, prefix: string, depth: number, maxDepth
   }
 }
 
-export function createInboxTool(workspaceDir: string) {
-  const inboxDir = join(workspaceDir, "_inbox");
+export function createInboxTool(workspaceDir: string, inboxPath?: string) {
+  const inboxDir = inboxPath ?? join(workspaceDir, "_inbox");
+  const inboxReal = resolve(inboxDir);
 
   return {
     name: INBOX_TOOL_NAME,
@@ -77,12 +92,14 @@ export function createInboxTool(workspaceDir: string) {
         const inboxFiles: string[] = [];
         if (existsSync(inboxDir)) {
           for (const entry of readdirSync(inboxDir, { withFileTypes: true })) {
-            const stat = statSync(join(inboxDir, entry.name));
-            inboxFiles.push(
-              entry.isDirectory()
-                ? `📁 ${entry.name}/`
-                : `📄 ${entry.name} (${formatBytes(stat.size)})`,
-            );
+            const stat = lstatSync(join(inboxDir, entry.name));
+            if (stat.isSymbolicLink()) {
+              inboxFiles.push(`🔗 ${entry.name} (symlink)`);
+            } else if (entry.isDirectory()) {
+              inboxFiles.push(`📁 ${entry.name}/`);
+            } else {
+              inboxFiles.push(`📄 ${entry.name} (${formatBytes(stat.size)})`);
+            }
           }
         }
 
@@ -99,11 +116,24 @@ export function createInboxTool(workspaceDir: string) {
         if (!target) {
           return jsonResult({ error: "target (filename) is required for peek" });
         }
-        const filePath = join(inboxDir, target);
+
+        if (!isSafeBasename(target)) {
+          return jsonResult({ error: "target must be a simple filename (no path separators or traversal)" });
+        }
+
+        const filePath = resolve(inboxDir, target);
+        if (!isInsideDir(inboxReal, filePath)) {
+          return jsonResult({ error: "target escapes the inbox directory" });
+        }
+
         if (!existsSync(filePath)) {
           return jsonResult({ error: `File not found in inbox: ${target}` });
         }
-        const stat = statSync(filePath);
+
+        const stat = lstatSync(filePath);
+        if (stat.isSymbolicLink()) {
+          return jsonResult({ type: "symlink", name: target, note: "Symlinks are not followed for safety" });
+        }
         if (stat.isDirectory()) {
           const contents = readdirSync(filePath);
           return jsonResult({
@@ -131,7 +161,7 @@ export function createInboxTool(workspaceDir: string) {
 
         const destDir = resolve(workspaceDir, target);
         const wsReal = resolve(workspaceDir);
-        if (!destDir.startsWith(wsReal)) {
+        if (!isInsideDir(wsReal, destDir)) {
           return jsonResult({ error: "target must be within the workspace" });
         }
 
@@ -150,15 +180,30 @@ export function createInboxTool(workspaceDir: string) {
         const errors: string[] = [];
 
         for (const name of filesToMove) {
-          const src = join(inboxDir, name);
+          if (!isSafeBasename(name)) {
+            errors.push(`${name}: rejected — must be a simple filename (no path separators or traversal)`);
+            continue;
+          }
+
+          const src = resolve(inboxDir, name);
+          if (!isInsideDir(inboxReal, src)) {
+            errors.push(`${name}: rejected — escapes inbox directory`);
+            continue;
+          }
+
           const dest = join(destDir, name);
           try {
             if (!existsSync(src)) {
               errors.push(`${name}: not found in inbox`);
               continue;
             }
-            // Use copy+delete for cross-device moves
-            const srcStat = statSync(src);
+
+            const srcStat = lstatSync(src);
+            if (srcStat.isSymbolicLink()) {
+              errors.push(`${name}: skipped — symlinks are not moved for safety`);
+              continue;
+            }
+
             if (srcStat.isDirectory()) {
               cpSync(src, dest, { recursive: true });
               rmSync(src, { recursive: true, force: true });

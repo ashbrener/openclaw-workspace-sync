@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdirSync, writeFileSync, existsSync, readdirSync, rmSync } from "node:fs";
+import { mkdirSync, writeFileSync, existsSync, readdirSync, rmSync, symlinkSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createInboxTool } from "../src/inbox-tool.js";
@@ -73,6 +73,14 @@ describe("inbox-tool", () => {
       expect(data.workspaceDirectories).not.toContain("_outbox");
       expect(data.workspaceDirectories).not.toContain("_inbox");
     });
+
+    it("shows symlinks as symlinks (lstat, not stat)", async () => {
+      writeFileSync(join(wsDir, "outside.txt"), "outside");
+      symlinkSync(join(wsDir, "outside.txt"), join(inboxDir, "link.txt"));
+      const res = await tool.execute("test", { action: "list" });
+      const data = getResult(res);
+      expect(data.inbox[0]).toContain("symlink");
+    });
   });
 
   describe("peek", () => {
@@ -106,6 +114,26 @@ describe("inbox-tool", () => {
       const res = await tool.execute("test", { action: "peek" });
       const data = getResult(res);
       expect(data.error).toContain("required");
+    });
+
+    it("rejects path traversal in peek", async () => {
+      const res = await tool.execute("test", { action: "peek", target: "../../etc/passwd" });
+      const data = getResult(res);
+      expect(data.error).toContain("simple filename");
+    });
+
+    it("rejects paths with separators in peek", async () => {
+      const res = await tool.execute("test", { action: "peek", target: "sub/file.txt" });
+      const data = getResult(res);
+      expect(data.error).toContain("simple filename");
+    });
+
+    it("reports symlinks without following them", async () => {
+      writeFileSync(join(wsDir, "secret.txt"), "secret");
+      symlinkSync(join(wsDir, "secret.txt"), join(inboxDir, "link.txt"));
+      const res = await tool.execute("test", { action: "peek", target: "link.txt" });
+      const data = getResult(res);
+      expect(data.type).toBe("symlink");
     });
   });
 
@@ -146,7 +174,7 @@ describe("inbox-tool", () => {
       expect(data.error).toContain("relative path");
     });
 
-    it("rejects path traversal", async () => {
+    it("rejects path traversal in target", async () => {
       writeFileSync(join(inboxDir, "f.txt"), "data");
       const res = await tool.execute("test", { action: "move", target: "../../etc" });
       const data = getResult(res);
@@ -167,6 +195,56 @@ describe("inbox-tool", () => {
       expect(data.moved).toHaveLength(1);
       expect(existsSync(join(wsDir, "dest", "subdir", "inner.txt"))).toBe(true);
       expect(existsSync(join(inboxDir, "subdir"))).toBe(false);
+    });
+
+    it("rejects files[] entries with path traversal", async () => {
+      writeFileSync(join(inboxDir, "good.txt"), "data");
+      const res = await tool.execute("test", {
+        action: "move",
+        target: "dest",
+        files: ["good.txt", "../escape.txt"],
+      });
+      const data = getResult(res);
+      expect(data.moved).toHaveLength(1);
+      expect(data.errors).toHaveLength(1);
+      expect(data.errors[0]).toContain("simple filename");
+    });
+
+    it("rejects files[] entries with path separators", async () => {
+      writeFileSync(join(inboxDir, "good.txt"), "data");
+      const res = await tool.execute("test", {
+        action: "move",
+        target: "dest",
+        files: ["sub/file.txt"],
+      });
+      const data = getResult(res);
+      expect(data.errors).toHaveLength(1);
+      expect(data.errors[0]).toContain("simple filename");
+    });
+
+    it("skips symlinks in inbox during move", async () => {
+      writeFileSync(join(wsDir, "real.txt"), "real");
+      symlinkSync(join(wsDir, "real.txt"), join(inboxDir, "link.txt"));
+      writeFileSync(join(inboxDir, "safe.txt"), "safe");
+      const res = await tool.execute("test", { action: "move", target: "dest" });
+      const data = getResult(res);
+      expect(data.moved).toHaveLength(1);
+      expect(data.moved[0]).toContain("safe.txt");
+      expect(data.errors).toHaveLength(1);
+      expect(data.errors[0]).toContain("symlink");
+    });
+  });
+
+  describe("custom inbox path", () => {
+    it("uses provided inboxPath instead of wsDir/_inbox", async () => {
+      const customInbox = join(wsDir, "subfolder", "_inbox");
+      mkdirSync(customInbox, { recursive: true });
+      writeFileSync(join(customInbox, "test.txt"), "data");
+      const customTool = createInboxTool(wsDir, customInbox);
+      const res = await customTool.execute("test", { action: "list" });
+      const data = getResult(res);
+      expect(data.inbox).toHaveLength(1);
+      expect(data.inbox[0]).toContain("test.txt");
     });
   });
 });

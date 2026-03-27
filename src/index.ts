@@ -31,6 +31,7 @@ import {
 } from "./rclone.js";
 import { homedir } from "node:os";
 import { readdirSync } from "node:fs";
+import { join } from "node:path";
 import type { WorkspaceSyncConfig, WorkspaceSyncProvider, RawPluginConfig, NestedPluginConfig } from "./types.js";
 
 function isErr<T extends { ok: boolean }>(r: T): r is Extract<T, { ok: false }> {
@@ -718,7 +719,9 @@ const workspaceSyncPlugin = {
     if (syncConfig.mode === "mailbox") {
       api.registerTool((ctx) => {
         const wsDir = ctx.workspaceDir ?? api.resolvePath("workspace");
-        return createInboxTool(wsDir);
+        const resolved = resolveSyncConfig(syncConfig, wsDir);
+        const inboxPath = join(resolved.localPath, "_inbox");
+        return createInboxTool(wsDir, inboxPath);
       });
     }
 
