@@ -30,12 +30,15 @@ import {
   type RcloneSyncResult,
 } from "./rclone.js";
 import { homedir } from "node:os";
+import { readdirSync } from "node:fs";
+import { join } from "node:path";
 import type { WorkspaceSyncConfig, WorkspaceSyncProvider, RawPluginConfig, NestedPluginConfig } from "./types.js";
 
 function isErr<T extends { ok: boolean }>(r: T): r is Extract<T, { ok: false }> {
   return !r.ok;
 }
-import { startSyncManager, stopSyncManager, getSyncManagerStatus } from "./sync-manager.js";
+import { startSyncManager, stopSyncManager, getSyncManagerStatus, isSyncing, triggerImmediateSync } from "./sync-manager.js";
+import { createInboxTool } from "./inbox-tool.js";
 import {
   runBackup,
   runRestore,
@@ -710,11 +713,24 @@ const workspaceSyncPlugin = {
     );
 
     // ========================================================================
+    // Agent Tool — inbox file management
+    // ========================================================================
+
+    if (syncConfig.mode === "mailbox") {
+      api.registerTool((ctx) => {
+        const wsDir = ctx.workspaceDir ?? api.resolvePath("workspace");
+        const resolved = resolveSyncConfig(syncConfig, wsDir);
+        const inboxPath = join(resolved.localPath, "_inbox");
+        return createInboxTool(wsDir, inboxPath);
+      });
+    }
+
+    // ========================================================================
     // Session Hooks
     // ========================================================================
 
     if (syncConfig.onSessionStart) {
-      api.on("session_start", async (_event, ctx) => {
+      api.on("session_start", async (_event, _ctx) => {
         if (!syncConfig.provider || syncConfig.provider === "off") return;
 
         if (!syncConfig.mode) {
@@ -722,88 +738,25 @@ const workspaceSyncPlugin = {
           return;
         }
 
+        if (isSyncing()) {
+          api.logger.info("[workspace-sync] sync already in progress, skipping session start trigger");
+          return;
+        }
+
         api.logger.info(`[workspace-sync] triggered on session start (mode: ${syncConfig.mode})`);
 
         try {
-          const installed = await isRcloneInstalled();
-          if (!installed) {
-            api.logger.warn("[workspace-sync] rclone not installed, skipping sync");
-            return;
-          }
-
-          const wsDir = ctx.agentId
-            ? api.resolvePath(`agents/${ctx.agentId}/workspace`)
-            : api.resolvePath("workspace");
-
-          const resolved = resolveSyncConfig(syncConfig, wsDir);
-
-          ensureRcloneConfigFromConfig(syncConfig, resolved.configPath, resolved.remoteName);
-
-          if (!isRcloneConfigured(resolved.configPath, resolved.remoteName)) {
-            api.logger.warn(
-              `[workspace-sync] rclone not configured for "${resolved.remoteName}", skipping`,
-            );
-            return;
-          }
-
-          let result: RcloneSyncResult;
-
-          if (resolved.mode === "mailbox") {
-            const mailboxExcludes = [...resolved.exclude, "_inbox/**", "_outbox/**"];
-            result = await runSync({
-              configPath: resolved.configPath,
-              remoteName: resolved.remoteName,
-              remotePath: resolved.remotePath,
-              localPath: resolved.localPath,
-              direction: "push",
-              exclude: mailboxExcludes,
-              timeoutMs: resolved.timeoutMs,
-              verbose: !!api.logger.debug,
-            });
-          } else if (resolved.mode === "mirror") {
-            result = await runSync({
-              configPath: resolved.configPath,
-              remoteName: resolved.remoteName,
-              remotePath: resolved.remotePath,
-              localPath: resolved.localPath,
-              direction: "pull",
-              exclude: resolved.exclude,
-              timeoutMs: resolved.timeoutMs,
-              verbose: !!api.logger.debug,
-            });
-          } else {
-            result = await runBisync({
-              configPath: resolved.configPath,
-              remoteName: resolved.remoteName,
-              remotePath: resolved.remotePath,
-              localPath: resolved.localPath,
-              conflictResolve: resolved.conflictResolve,
-              exclude: resolved.exclude,
-              copySymlinks: resolved.copySymlinks,
-              timeoutMs: resolved.timeoutMs,
-              verbose: !!api.logger.debug,
-            });
-          }
-
-          if (result.ok) {
-            api.logger.info("[workspace-sync] session start sync completed");
-          } else if ((result as any).error?.includes("--resync")) {
-            api.logger.warn(
-              "[workspace-sync] first sync requires manual --resync. Run: openclaw workspace-sync sync --resync",
-            );
-          } else {
-            api.logger.error(`[workspace-sync] sync failed: ${(result as any).error}`);
-          }
+          await triggerImmediateSync();
         } catch (err) {
           api.logger.error(
-            `[workspace-sync] error: ${err instanceof Error ? err.message : String(err)}`,
+            `[workspace-sync] session start sync error: ${err instanceof Error ? err.message : String(err)}`,
           );
         }
       });
     }
 
     if (syncConfig.onSessionEnd) {
-      api.on("session_end", async (_event, ctx) => {
+      api.on("session_end", async (_event, _ctx) => {
         if (!syncConfig.provider || syncConfig.provider === "off") return;
 
         if (!syncConfig.mode) {
@@ -811,69 +764,18 @@ const workspaceSyncPlugin = {
           return;
         }
 
+        if (isSyncing()) {
+          api.logger.info("[workspace-sync] sync already in progress, skipping session end trigger");
+          return;
+        }
+
         api.logger.info(`[workspace-sync] triggered on session end (mode: ${syncConfig.mode})`);
 
         try {
-          const installed = await isRcloneInstalled();
-          if (!installed) return;
-
-          const wsDir = ctx.agentId
-            ? api.resolvePath(`agents/${ctx.agentId}/workspace`)
-            : api.resolvePath("workspace");
-
-          const resolved = resolveSyncConfig(syncConfig, wsDir);
-
-          ensureRcloneConfigFromConfig(syncConfig, resolved.configPath, resolved.remoteName);
-
-          if (!isRcloneConfigured(resolved.configPath, resolved.remoteName)) return;
-
-          let result: RcloneSyncResult;
-
-          if (resolved.mode === "mailbox") {
-            const mailboxExcludes = [...resolved.exclude, "_inbox/**", "_outbox/**"];
-            result = await runSync({
-              configPath: resolved.configPath,
-              remoteName: resolved.remoteName,
-              remotePath: resolved.remotePath,
-              localPath: resolved.localPath,
-              direction: "push",
-              exclude: mailboxExcludes,
-              timeoutMs: resolved.timeoutMs,
-              verbose: !!api.logger.debug,
-            });
-          } else if (resolved.mode === "mirror") {
-            result = await runSync({
-              configPath: resolved.configPath,
-              remoteName: resolved.remoteName,
-              remotePath: resolved.remotePath,
-              localPath: resolved.localPath,
-              direction: "pull",
-              exclude: resolved.exclude,
-              timeoutMs: resolved.timeoutMs,
-              verbose: !!api.logger.debug,
-            });
-          } else {
-            result = await runBisync({
-              configPath: resolved.configPath,
-              remoteName: resolved.remoteName,
-              remotePath: resolved.remotePath,
-              localPath: resolved.localPath,
-              conflictResolve: resolved.conflictResolve,
-              exclude: resolved.exclude,
-              copySymlinks: resolved.copySymlinks,
-              timeoutMs: resolved.timeoutMs,
-              verbose: !!api.logger.debug,
-            });
-          }
-
-          if (result.ok) {
-            api.logger.info("[workspace-sync] session end sync completed");
-          } else {
-            api.logger.error(`[workspace-sync] sync failed: ${(result as any).error}`);
-          }
+          await triggerImmediateSync();
         } catch (err) {
           api.logger.error(
-            `[workspace-sync] error: ${err instanceof Error ? err.message : String(err)}`,
+            `[workspace-sync] session end sync error: ${err instanceof Error ? err.message : String(err)}`,
           );
         }
       });
@@ -896,10 +798,24 @@ const workspaceSyncPlugin = {
         let onInboxFiles: ((files: string[]) => void) | undefined;
         if (syncConfig.notifyOnInbox) {
           onInboxFiles = (files) => {
-            const listing = files.length <= 5
-              ? files.join(", ")
-              : `${files.slice(0, 5).join(", ")} and ${files.length - 5} more`;
-            const text = `[workspace-sync] New files in _inbox: ${listing}`;
+            const listing = files.length <= 10
+              ? files.map((f) => `  • ${f}`).join("\n")
+              : files.slice(0, 10).map((f) => `  • ${f}`).join("\n") + `\n  … and ${files.length - 10} more`;
+
+            let dirListing = "";
+            try {
+              const dirs = readdirSync(wsDir, { withFileTypes: true })
+                .filter((d) => d.isDirectory() && !d.name.startsWith(".") && d.name !== "_inbox" && d.name !== "_outbox" && d.name !== "node_modules")
+                .map((d) => d.name)
+                .sort();
+              if (dirs.length > 0) {
+                dirListing = "\n\nWorkspace directories:\n" + dirs.map((d) => `  📁 ${d}`).join("\n");
+              }
+            } catch {
+              // best-effort
+            }
+
+            const text = `📥 New files arrived in _inbox:\n${listing}${dirListing}\n\nTo move them, tell me which directory (e.g. "move inbox files to CODE/myproject").`;
 
             const cfg = api.config as Record<string, any>;
             const agents = cfg?.agents?.list ?? [];
@@ -911,7 +827,7 @@ const workspaceSyncPlugin = {
               ? "global"
               : `agent:${defaultAgentId}:${mainKey}`;
 
-            api.logger.info(`${text} (notifying session ${sessionKey})`);
+            api.logger.info(`[workspace-sync] Inbox notification → session ${sessionKey}: ${files.length} file(s)`);
 
             try {
               api.runtime.system.enqueueSystemEvent(text, { sessionKey });

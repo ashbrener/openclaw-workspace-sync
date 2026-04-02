@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { startSyncManager, stopSyncManager, getSyncManagerStatus } from "../src/sync-manager.js";
+import { startSyncManager, stopSyncManager, getSyncManagerStatus, isSyncing } from "../src/sync-manager.js";
 
 const mockLogger = {
   debug: vi.fn(),
@@ -29,6 +29,12 @@ describe("sync-manager", () => {
     });
   });
 
+  describe("isSyncing", () => {
+    it("returns false when not syncing", () => {
+      expect(isSyncing()).toBe(false);
+    });
+  });
+
   describe("startSyncManager", () => {
     it("logs and returns when provider is off", () => {
       startSyncManager({ provider: "off" }, "/workspace", "/state", mockLogger);
@@ -48,9 +54,23 @@ describe("sync-manager", () => {
       expect(getSyncManagerStatus().running).toBe(false);
     });
 
+    it("errors when mode is not set", () => {
+      startSyncManager(
+        { provider: "dropbox", interval: 300 },
+        "/workspace",
+        "/state",
+        mockLogger,
+      );
+
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.stringContaining('"mode" is now required'),
+      );
+      expect(getSyncManagerStatus().running).toBe(false);
+    });
+
     it("logs disabled when interval is 0", () => {
       startSyncManager(
-        { provider: "dropbox", interval: 0 },
+        { provider: "dropbox", mode: "mailbox", interval: 0 },
         "/workspace",
         "/state",
         mockLogger,
@@ -64,7 +84,7 @@ describe("sync-manager", () => {
 
     it("enforces minimum 60s interval", () => {
       startSyncManager(
-        { provider: "dropbox", interval: 10 },
+        { provider: "dropbox", mode: "mailbox", interval: 10 },
         "/workspace",
         "/state",
         mockLogger,
@@ -78,14 +98,14 @@ describe("sync-manager", () => {
 
     it("starts with valid interval", () => {
       startSyncManager(
-        { provider: "dropbox", interval: 300 },
+        { provider: "dropbox", mode: "mailbox", interval: 300 },
         "/workspace",
         "/state",
         mockLogger,
       );
 
       expect(mockLogger.info).toHaveBeenCalledWith(
-        "[workspace-sync] Starting periodic sync every 300s (pure file sync, zero LLM cost)",
+        "[workspace-sync] Starting periodic sync every 300s in mailbox mode (pure file sync, zero LLM cost)",
       );
       expect(getSyncManagerStatus().running).toBe(true);
     });
@@ -94,7 +114,7 @@ describe("sync-manager", () => {
   describe("stopSyncManager", () => {
     it("stops a running manager", () => {
       startSyncManager(
-        { provider: "dropbox", interval: 300 },
+        { provider: "dropbox", mode: "mailbox", interval: 300 },
         "/workspace",
         "/state",
         mockLogger,
