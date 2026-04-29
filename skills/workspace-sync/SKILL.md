@@ -151,10 +151,35 @@ When configured, sync runs automatically:
 ## Troubleshooting
 
 ### "rclone not configured"
-Run the setup wizard:
+
+First, install `rclone` via your OS package manager:
+
+```bash
+# macOS
+brew install rclone
+
+# Debian/Ubuntu
+sudo apt-get install rclone
+
+# Fedora
+sudo dnf install rclone
+
+# Arch
+sudo pacman -S rclone
+
+# Alpine
+sudo apk add rclone
+```
+
+For other platforms, see https://rclone.org/install/
+
+**Security note:** This skill never pipes remote install scripts to your shell. Install rclone via your OS package manager, then run the setup wizard:
+
 ```bash
 openclaw workspace-sync setup
 ```
+
+The setup wizard will only attempt installation via your detected OS package manager (brew/apt/dnf/yum/pacman/apk) — it will never use `curl | sudo sh`.
 
 ### "requires --resync" (bisync only)
 Bisync state was lost. **Before running `--resync`, verify both sides are correct**:

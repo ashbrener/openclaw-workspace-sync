@@ -24,30 +24,50 @@ check_rclone() {
 }
 
 install_rclone() {
-  log "rclone not found. Installing..."
+  # Only use OS package managers — never pipe a remote script to a shell.
+  log "rclone not found. Attempting install via your OS package manager..."
 
-  if [ "$(uname -s)" = "Darwin" ] && command -v brew >/dev/null 2>&1; then
+  OS="$(uname -s)"
+  if [ "$OS" = "Darwin" ] && command -v brew >/dev/null 2>&1; then
     log "Installing via Homebrew..."
     brew install rclone
-  elif command -v curl >/dev/null 2>&1; then
-    log "Installing via rclone.org install script..."
-    curl -fsSL https://rclone.org/install.sh | sudo sh
+  elif [ "$OS" = "Linux" ] && command -v apt-get >/dev/null 2>&1; then
+    log "Installing via apt-get..."
+    sudo apt-get update && sudo apt-get install -y rclone
+  elif [ "$OS" = "Linux" ] && command -v dnf >/dev/null 2>&1; then
+    log "Installing via dnf..."
+    sudo dnf install -y rclone
+  elif [ "$OS" = "Linux" ] && command -v yum >/dev/null 2>&1; then
+    log "Installing via yum..."
+    sudo yum install -y rclone
+  elif [ "$OS" = "Linux" ] && command -v pacman >/dev/null 2>&1; then
+    log "Installing via pacman..."
+    sudo pacman -S --noconfirm rclone
+  elif [ "$OS" = "Linux" ] && command -v apk >/dev/null 2>&1; then
+    log "Installing via apk..."
+    sudo apk add rclone
   else
-    err "Cannot auto-install rclone. Install manually: https://rclone.org/install/"
+    err "No supported package manager found."
+    err "Please install rclone manually: https://rclone.org/install/"
+    err "Then re-run this setup."
     exit 1
   fi
 
   if ! command -v rclone >/dev/null 2>&1; then
-    err "rclone installation failed."
+    err "rclone installation failed. Install manually: https://rclone.org/install/"
     exit 1
   fi
   log "rclone installed successfully."
 }
 
 if ! check_rclone; then
-  ask "Install rclone now? [Y/n]"
+  printf '\n[workspace-sync] rclone is not installed.\n'
+  printf '[workspace-sync] This script can install it via your OS package manager (brew/apt/dnf/yum/pacman/apk).\n'
+  printf '[workspace-sync] We will NOT pipe any remote scripts to your shell.\n'
+  printf '[workspace-sync] If you prefer to install manually: https://rclone.org/install/\n\n'
+  ask "Install rclone via your OS package manager now? [Y/n]"
   case "$REPLY" in
-    [nN]*) err "rclone is required. Exiting."; exit 1 ;;
+    [nN]*) err "rclone is required. Install it manually and re-run setup."; exit 1 ;;
     *) install_rclone ;;
   esac
 fi

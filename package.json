@@ -1,12 +1,12 @@
 {
   "name": "openclaw-workspace-sync",
-  "version": "2.4.0",
+  "version": "2.4.1",
   "description": "Workspace cloud sync & encrypted backup via rclone — mailbox, mirror, bisync + AES-256 snapshots (Dropbox, S3, R2, 70+ providers)",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "license": "MIT",
-  "author": "ashbrener",
+  "author": "Ash Brener <ash@frisb.com> (https://github.com/ashbrener)",
   "repository": {
     "type": "git",
     "url": "https://github.com/ashbrener/openclaw-workspace-sync.git"
