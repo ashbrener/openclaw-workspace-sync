@@ -19,6 +19,11 @@ jobs:
           node-version: 22
           registry-url: https://registry.npmjs.org
 
+      # npm bundled with Node 22 (10.x) lacks OIDC trusted publishing support.
+      # Pin to npm 11.4.2 — `npm@latest` currently has a promise-retry bug.
+      - name: Install npm 11.4.2 (OIDC support)
+        run: npm install -g npm@11.4.2
+
       - name: Install dependencies
         run: npm install
 
