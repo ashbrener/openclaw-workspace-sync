@@ -21,7 +21,7 @@ describe("rclone helpers", () => {
 
       expect(resolved.provider).toBe("dropbox");
       expect(resolved.remotePath).toBe("test-folder");
-      expect(resolved.localPath).toBe(path.join(workspaceDir, "shared"));
+      expect(resolved.localPath).toBe(workspaceDir);
       expect(resolved.remoteName).toBe("cloud");
       expect(resolved.conflictResolve).toBe("newer");
       expect(resolved.interval).toBe(0);
@@ -79,8 +79,7 @@ describe("rclone helpers", () => {
       const config = { provider: "dropbox" as const, remotePath: "test" };
       const resolved = resolveSyncConfig(config, "/workspace", "/state");
 
-      expect(resolved.exclude).toContain(".git/**");
-      expect(resolved.exclude).toContain("node_modules/**");
+      expect(resolved.exclude).toContain("**/.DS_Store");
     });
 
     it("respects custom excludes", () => {

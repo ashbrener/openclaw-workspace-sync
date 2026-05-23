@@ -415,6 +415,10 @@ export function getSyncManagerStatus(): {
   };
 }
 
+export function isSyncing(): boolean {
+  return state.syncing;
+}
+
 export async function triggerImmediateSync(): Promise<void> {
   await doSync();
 }
